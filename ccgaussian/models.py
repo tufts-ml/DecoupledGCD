@@ -8,9 +8,9 @@ class DinoCCG(nn.Module):
         super().__init__()
         self.num_classes = num_classes
         self.embed_mag = embed_mag
-        self.embed_len = 4096
         # pretrained DINO backbone
         self.dino = torch.hub.load('facebookresearch/dino:main', 'dino_vitb16')
+        self.embed_len = self.dino.norm.normalized_shape[0]
         # linear classification head
         self.classifier = nn.Linear(self.embed_len, num_classes)
         # class-conditional Gaussian parameters
