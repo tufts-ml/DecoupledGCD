@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 ccgaussian = {editable = true, path = "."}
+polycraft-nov-data = {editable = true, path = "./submodules/polycraft-novelty-data"}
 
 [dev-packages]
 
