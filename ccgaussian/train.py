@@ -1,4 +1,14 @@
 import argparse
+from pathlib import Path
+
+import torch
+from torch.utils.tensorboard import SummaryWriter
+
+from polycraft_nov_data.dataloader import novelcraft_dataloader
+
+from ccgaussian.dino_trans import DINOTestTrans
+from ccgaussian.loss import NDCCLoss
+from ccgaussian.model import DinoCCG
 
 
 def get_args():
@@ -33,12 +43,86 @@ def get_args():
 
 
 def train_ndcc(args):
-    # init dataset
+    # choose device
+    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    # init dataloaders
+    if args.dataset == "NovelCraft":
+        train_loader = novelcraft_dataloader("train", DINOTestTrans(), args.batch_size,
+                                             balance_classes=True)
+        valid_loader = novelcraft_dataloader("valid_norm", DINOTestTrans(), args.batch_size,
+                                             balance_classes=False)
+    for x in train_loader:
+        print(x)
+        break
     # init model
+    model = DinoCCG(args.num_classes, args.e_mag)
     # init optimizer
+    optim = torch.optim.SGD([
+        {
+            "params": model.dino.parameters(),
+            "lr": args.lr_e,
+            "weignt_decay": 5e-4,
+        },
+        {
+            "params": model.classifier.parameters(),
+            "lr": args.lr_c,
+        },
+        {
+            "params": [model.sigma],
+            "lr": args.lr_s,
+        },
+        {
+            "params": [model.deltas],
+            "lr": args.lr_d,
+        },
+    ], momentum=args.momentum)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        optim, milestones=args.lr_milestones, gamma=0.1)
+    # init loss
+    loss_func = NDCCLoss(args.w_ccg, args.w_nll)
     # init tensorboard
-    # training epochs
-    pass
+    writer = SummaryWriter()
+    # model training
+    for epoch in range(args.num_epochs):
+        # Each epoch has a training and validation phase
+        for phase in ["train", "val"]:
+            if phase == "train":
+                model.train()
+                dataloader = train_loader
+            else:
+                model.eval()
+                dataloader = valid_loader
+            # vars for tensorboard stats
+            cnt = 0
+            epoch_loss = 0.
+            epoch_acc = 0.
+            for data, targets in dataloader:
+                # forward and loss
+                data = (data.to(device))
+                targets = (targets.long().to(device))
+                optim.zero_grad()
+                with torch.set_grad_enabled(phase == "train"):
+                    logits, norm_embeds, means, sigma2s = model(data)
+                    loss = loss_func(logits, norm_embeds, means, sigma2s, targets)
+                # backward and optimize only if in training phase
+                if phase == "train":
+                    loss.backward()
+                    optim.step()
+                # statistics
+                _, preds = torch.max(logits, 1)
+                epoch_loss = (loss.item() * data.size(0) +
+                              cnt * epoch_loss) / (cnt + data.size(0))
+                epoch_acc = (torch.sum(preds == targets.data) +
+                             epoch_acc * cnt).double() / (cnt + data.size(0))
+                cnt += data.size(0)
+            if phase == "train":
+                scheduler.step()
+                writer.add_scalar("Average Train Loss", epoch_loss, epoch)
+                writer.add_scalar("Average Train Acc", epoch_acc, epoch)
+            else:
+                writer.add_scalar("Average Valid Loss", epoch_loss, epoch)
+                writer.add_scalar("Average Valid Acc", epoch_acc, epoch)
+    torch.save(model, Path(writer.get_logdir()) / f"{args.num_epochs}.pt")
 
 
 if __name__ == "__main__":
