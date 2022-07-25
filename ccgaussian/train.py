@@ -51,11 +51,8 @@ def train_ndcc(args):
                                              balance_classes=True)
         valid_loader = novelcraft_dataloader("valid_norm", DINOTestTrans(), args.batch_size,
                                              balance_classes=False)
-    for x in train_loader:
-        print(x)
-        break
     # init model
-    model = DinoCCG(args.num_classes, args.e_mag)
+    model = DinoCCG(args.num_classes, args.e_mag).to(device)
     # init optimizer
     optim = torch.optim.SGD([
         {
