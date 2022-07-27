@@ -119,7 +119,7 @@ def train_ndcc(args):
             else:
                 writer.add_scalar("Average Valid Loss", epoch_loss, epoch)
                 writer.add_scalar("Average Valid Acc", epoch_acc, epoch)
-    torch.save(model, Path(writer.get_logdir()) / f"{args.num_epochs}.pt")
+    torch.save(model.state_dict(), Path(writer.get_logdir()) / f"{args.num_epochs}.pt")
 
 
 if __name__ == "__main__":
