@@ -29,7 +29,7 @@ def get_args():
     parser.add_argument("--lr_d", type=float, default=1e-3,
                         help="Learning rate for delta_j")
     parser.add_argument("--momentum", type=float, default=0.9)
-    parser.add_argument("--lr_milestones", default=[25, 28, 30])
+    parser.add_argument("--lr_milestones", default=[15, 25, 29])
     # loss hyperparameters
     parser.add_argument("--w_ccg", type=float, default=2e-1,
                         help="CCG loss weight, lambda in Eq. (23)")
