@@ -14,8 +14,8 @@ class DinoCCG(nn.Module):
         # linear classification head
         self.classifier = nn.Linear(self.embed_len, num_classes)
         # class-conditional Gaussian parameters
-        self.sigma = torch.ones((1,), dtype=torch.float32, requires_grad=True)
-        self.deltas = torch.zeros((self.embed_len,), dtype=torch.float32, requires_grad=True)
+        self.sigma = nn.parameter.Parameter(torch.ones((1,), dtype=torch.float32))
+        self.deltas = nn.parameter.Parameter(torch.zeros((self.embed_len,), dtype=torch.float32))
         # variance lower bound to prevent very large losses
         self.var_min = .1
 
