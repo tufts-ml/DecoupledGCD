@@ -127,3 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# assume Pytorch files are too big for GitHub
+*.pt
