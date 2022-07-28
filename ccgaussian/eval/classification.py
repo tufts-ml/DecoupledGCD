@@ -29,7 +29,7 @@ def sq_mahalanobis_dist(embeds, means, sigma2s):
 
 if __name__ == "__main__":
     device = torch.device("cuda:0")
-    model = load_dino_ccg(device)
+    model = load_dino_ccg().to(device)
     valid_dataloader = novelcraft_dataloader("valid_norm", DINOTestTrans(), batch_size=128)
     classifier_pred = torch.tensor([])
     ccg_pred = torch.tensor([])
@@ -44,3 +44,4 @@ if __name__ == "__main__":
         break
     print(f"Classifier accuracy: {torch.sum(classifier_pred == true_targets) / len(true_targets)}")
     print(f"CCG accuracy: {torch.sum(ccg_pred == true_targets) / len(true_targets)}")
+    print(f"Model agreement: {torch.sum(classifier_pred == ccg_pred) / len(true_targets)}")
