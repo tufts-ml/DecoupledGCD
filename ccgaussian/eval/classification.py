@@ -38,13 +38,13 @@ if __name__ == "__main__":
     ccg_pred = torch.tensor([])
     true_targets = torch.tensor([])
     for data, targets in valid_dataloader:
-        logits, norm_embeds, means, sigma2s = model(data.to(device))
-        logits = logits.to("cpu")
-        dists = sq_mahalanobis_dist(norm_embeds, means, sigma2s).to("cpu")
-        classifier_pred = torch.hstack((classifier_pred, torch.argmax(logits, 1)))
-        ccg_pred = torch.hstack((ccg_pred, torch.argmin(dists, 1)))
-        true_targets = torch.hstack((true_targets, targets))
-        break
+        with torch.no_grad():
+            logits, norm_embeds, means, sigma2s = model(data.to(device))
+            logits = logits.to("cpu")
+            dists = sq_mahalanobis_dist(norm_embeds, means, sigma2s).to("cpu")
+            classifier_pred = torch.hstack((classifier_pred, torch.argmax(logits, 1)))
+            ccg_pred = torch.hstack((ccg_pred, torch.argmin(dists, 1)))
+            true_targets = torch.hstack((true_targets, targets))
     # print stats
     print(f"Classifier accuracy: {torch.sum(classifier_pred == true_targets) / len(true_targets)}")
     print(f"CCG accuracy: {torch.sum(ccg_pred == true_targets) / len(true_targets)}")
