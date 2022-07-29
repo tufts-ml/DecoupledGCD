@@ -1,3 +1,6 @@
+from pathlib import Path
+
+from sklearn.metrics import ConfusionMatrixDisplay
 import torch
 
 from polycraft_nov_data.dataloader import novelcraft_dataloader
@@ -42,6 +45,13 @@ if __name__ == "__main__":
         ccg_pred = torch.hstack((ccg_pred, torch.argmin(dists, 1)))
         true_targets = torch.hstack((true_targets, targets))
         break
+    # print stats
     print(f"Classifier accuracy: {torch.sum(classifier_pred == true_targets) / len(true_targets)}")
     print(f"CCG accuracy: {torch.sum(ccg_pred == true_targets) / len(true_targets)}")
     print(f"Model agreement: {torch.sum(classifier_pred == ccg_pred) / len(true_targets)}")
+    # save confusion matrices
+    output_dir = Path("runs/DinoCCG_0_0_1")
+    ConfusionMatrixDisplay.from_predictions(true_targets, classifier_pred) \
+        .plot().savefig(output_dir / "class_con_mat.png")
+    ConfusionMatrixDisplay.from_predictions(true_targets, ccg_pred) \
+        .plot().savefig(output_dir / "ccg_con_mat.png")

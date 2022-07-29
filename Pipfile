@@ -10,4 +10,4 @@ polycraft-nov-data = {editable = true, path = "./submodules/polycraft-novelty-da
 [dev-packages]
 
 [requires]
-python_version = "3"
+python_version = "3.8"
