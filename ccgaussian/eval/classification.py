@@ -52,6 +52,6 @@ if __name__ == "__main__":
     # save confusion matrices
     output_dir = Path("runs/DinoCCG_0_0_1")
     ConfusionMatrixDisplay.from_predictions(true_targets, classifier_pred) \
-        .plot().savefig(output_dir / "class_con_mat.png")
+        .plot().figure_.savefig(output_dir / "class_con_mat.png")
     ConfusionMatrixDisplay.from_predictions(true_targets, ccg_pred) \
-        .plot().savefig(output_dir / "ccg_con_mat.png")
+        .plot().figure_.savefig(output_dir / "ccg_con_mat.png")
