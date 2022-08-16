@@ -34,3 +34,17 @@ class NDCCLoss(torch.nn.Module):
             self.md_loss(norm_embeds, means, sigma2s, targets) +
             self.w_nll * self.nll_loss(norm_embeds, means, sigma2s, targets)
         )
+
+
+class UnsupMDLoss(torch.nn.Module):
+    def __init__(self, w_ccg) -> None:
+        super().__init__()
+        self.w_ccg = w_ccg
+
+    @staticmethod
+    def unsup_md_loss(norm_embeds_1, norm_embeds_2, sigma2s):
+        return ((norm_embeds_1 - norm_embeds_2)**2 / sigma2s.detach()).sum() / \
+            (2 * norm_embeds_1.shape[0])
+
+    def forward(self, norm_embeds_1, norm_embeds_2, sigma2s):
+        return self.w_ccg * self.unsup_md_loss(norm_embeds_1, norm_embeds_2, sigma2s)
