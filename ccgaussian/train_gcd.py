@@ -1,0 +1,148 @@
+import argparse
+from pathlib import Path
+
+import torch
+from torch.utils.tensorboard import SummaryWriter
+
+from polycraft_nov_data.dataloader import novelcraft_dataloader
+
+from ccgaussian.dino_trans import DINOTestTrans, DINOConsistentTrans
+from ccgaussian.loss import NDCCLoss, UnsupMDLoss
+from ccgaussian.model import DinoCCG
+
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", type=str, default="NovelCraft", choices=["NovelCraft"])
+    # model hyperparameters
+    parser.add_argument("--e_mag", type=float, default=16, help="Embedding magnitued")
+    # training hyperparameters
+    parser.add_argument("--num_epochs", type=int, default=30,
+                        help="Number of training epochs")
+    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--lr_e", type=float, default=1e-3,
+                        help="Learning rate for embedding v(x)")
+    parser.add_argument("--lr_c", type=float, default=1e-1,
+                        help="Learning rate for linear classifier {w_y, b_y}")
+    parser.add_argument("--lr_s", type=float, default=1e-1,
+                        help="Learning rate for sigma")
+    parser.add_argument("--lr_d", type=float, default=1e-3,
+                        help="Learning rate for delta_j")
+    parser.add_argument("--momentum", type=float, default=0.9)
+    parser.add_argument("--lr_milestones", default=[15, 25, 29])
+    # loss hyperparameters
+    parser.add_argument("--w_ccg", type=float, default=2e-1,
+                        help="CCG loss weight, lambda in Eq. (23)")
+    parser.add_argument("--w_nll", type=float, default=1 / 4096,
+                        help="Negative log-likelihood weight, gamma in Eq. (22)")
+    args = parser.parse_args()
+    # add dataset related args
+    if args.dataset == "NovelCraft":
+        args.num_classes = 5
+    return args
+
+
+def train_gcd(args):
+    # choose device
+    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    # init dataloaders
+    if args.dataset == "NovelCraft":
+        sup_train_loader = novelcraft_dataloader("train", DINOTestTrans(), args.batch_size,
+                                                 balance_classes=True)
+        unsup_train_loader = novelcraft_dataloader("valid", DINOConsistentTrans(), args.batch_size)
+        sup_valid_loader = novelcraft_dataloader("test_norm", DINOTestTrans(), args.batch_size,
+                                                 balance_classes=False)
+        # unsup iterator to have unaligned epochs
+        unsup_iter = iter(unsup_train_loader)
+    # init model
+    model = DinoCCG(args.num_classes, args.e_mag).to(device)
+    # init optimizer
+    optim = torch.optim.SGD([
+        {
+            "params": model.dino.parameters(),
+            "lr": args.lr_e,
+            "weignt_decay": 5e-4,
+        },
+        {
+            "params": model.classifier.parameters(),
+            "lr": args.lr_c,
+        },
+        {
+            "params": [model.sigma],
+            "lr": args.lr_s,
+        },
+        {
+            "params": [model.deltas],
+            "lr": args.lr_d,
+        },
+    ], momentum=args.momentum)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        optim, milestones=args.lr_milestones, gamma=0.1)
+    # init loss
+    sup_loss_func = NDCCLoss(args.w_ccg, args.w_nll)
+    unsup_loss_func = UnsupMDLoss(args.w_ccg)
+    # init tensorboard
+    writer = SummaryWriter()
+    # model training
+    for epoch in range(args.num_epochs):
+        # Each epoch has a training and validation phase
+        for phase in ["train", "val"]:
+            if phase == "train":
+                model.train()
+                sup_loader = sup_train_loader
+            else:
+                model.eval()
+                sup_loader = sup_valid_loader
+            # vars for tensorboard stats
+            count = 0
+            epoch_sup_loss = 0.
+            epoch_unsup_loss = 0.
+            epoch_acc = 0.
+            for data, targets in sup_loader:
+                # supervised forward and loss
+                data = (data.to(device))
+                targets = (targets.long().to(device))
+                optim.zero_grad()
+                with torch.set_grad_enabled(phase == "train"):
+                    logits, norm_embeds, means, sigma2s = model(data)
+                    sup_loss = sup_loss_func(logits, norm_embeds, means, sigma2s, targets)
+                # unsupervised forward and loss
+                unsup_loss = 0
+                if phase == "train":
+                    # get unlabeled batch
+                    try:
+                        (u_data, u_t_data), _ = next(unsup_iter)
+                    except StopIteration:
+                        unsup_iter = iter(unsup_train_loader)
+                        (u_data, u_t_data), _ = next(unsup_iter)
+                    u_data, u_t_data = u_data.to(device), u_t_data.to(device)
+                    _, u_norm_embeds, _, sigma2s = model(u_data)
+                    _, u_t_norm_embeds, _, _ = model(u_t_data)
+                    unsup_loss = unsup_loss_func(u_norm_embeds, u_t_norm_embeds, sigma2s)
+                    # backward and optimize
+                    loss = sup_loss + unsup_loss
+                    loss.backward()
+                    optim.step()
+                # statistics
+                _, preds = torch.max(logits, 1)
+                epoch_sup_loss = (sup_loss.item() * data.size(0) +
+                                  count * epoch_sup_loss) / (count + data.size(0))
+                epoch_unsup_loss = (unsup_loss.item() * data.size(0) +
+                                    count * epoch_unsup_loss) / (count + data.size(0))
+                epoch_acc = (torch.sum(preds == targets.data) +
+                             epoch_acc * count).double() / (count + data.size(0))
+                count += data.size(0)
+            if phase == "train":
+                scheduler.step()
+                writer.add_scalar("Average Train Supervised Loss", epoch_sup_loss, epoch)
+                writer.add_scalar("Average Train Unsupervised Loss", epoch_unsup_loss, epoch)
+                writer.add_scalar("Average Train Accuracy", epoch_acc, epoch)
+            else:
+                writer.add_scalar("Average Valid Supervised Loss", epoch_sup_loss, epoch)
+                writer.add_scalar("Average Valid Accuracy", epoch_acc, epoch)
+    torch.save(model.state_dict(), Path(writer.get_logdir()) / f"{args.num_epochs}.pt")
+
+
+if __name__ == "__main__":
+    args = get_args()
+    train_gcd(args)
