@@ -1,7 +1,9 @@
 import argparse
+import os
 from pathlib import Path
 
 import torch
+from torch.nn.parallel import DistributedDataParallel
 from torch.utils.tensorboard import SummaryWriter
 
 from polycraft_nov_data.dataloader import novelcraft_dataloader
@@ -14,6 +16,7 @@ from ccgaussian.model import DinoCCG
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str, default="NovelCraft", choices=["NovelCraft"])
+    parser.add_argument("--device", type=int, help="CUDA device index or unused for CPU")
     # model hyperparameters
     parser.add_argument("--e_mag", type=float, default=16, help="Embedding magnitued")
     # training hyperparameters
@@ -44,7 +47,7 @@ def get_args():
 
 def train_gcd(args):
     # choose device
-    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device(f"cuda:{args.device}") if args.device is not None else torch.device("cpu")
     # init dataloaders
     if args.dataset == "NovelCraft":
         sup_train_loader = novelcraft_dataloader("train", DINOTestTrans(), args.batch_size,
@@ -78,6 +81,9 @@ def train_gcd(args):
     ], momentum=args.momentum)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(
         optim, milestones=args.lr_milestones, gamma=0.1)
+    # convert model for parallel processing
+    if args.device is not None:
+        model = DistributedDataParallel(model, [args.device])
     # init loss
     sup_loss_func = NDCCLoss(args.w_ccg, args.w_nll)
     unsup_loss_func = UnsupMDLoss(args.w_ccg)
@@ -150,6 +156,19 @@ def train_gcd(args):
     torch.save(model.state_dict(), Path(writer.get_logdir()) / f"{args.num_epochs}.pt")
 
 
+def launch_parallel(rank, world_size, args):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+    torch.distributed.init_process_group("gloo", rank=rank, world_size=world_size)
+    args.device = rank
+    train_gcd(args)
+
+
 if __name__ == "__main__":
     args = get_args()
-    train_gcd(args)
+    use_parallel = True
+    if not use_parallel:
+        train_gcd(args)
+    else:
+        world_size = 2
+        torch.multiprocessing.spawn(launch_parallel, (world_size, args), world_size)
