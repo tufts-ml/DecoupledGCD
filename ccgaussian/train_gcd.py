@@ -94,7 +94,8 @@ def train_gcd(args):
                 model.eval()
                 sup_loader = sup_valid_loader
             # vars for tensorboard stats
-            count = 0
+            sup_count = 0
+            unsup_count = 0
             epoch_sup_loss = 0.
             epoch_unsup_loss = 0.
             epoch_acc = 0.
@@ -106,15 +107,25 @@ def train_gcd(args):
                 with torch.set_grad_enabled(phase == "train"):
                     logits, norm_embeds, means, sigma2s = model(data)
                     sup_loss = sup_loss_func(logits, norm_embeds, means, sigma2s, targets)
-                # unsupervised forward and loss
+                # supervised stats
+                _, preds = torch.max(logits, 1)
+                epoch_sup_loss = (sup_loss.item() * data.size(0) +
+                                  sup_count * epoch_sup_loss) / (sup_count + data.size(0))
+                epoch_acc = (torch.sum(preds == targets.data) +
+                             epoch_acc * sup_count).double() / (sup_count + data.size(0))
+                sup_count += data.size(0)
+                # unsupervised forward, loss, and backprop
                 unsup_loss = 0
                 if phase == "train":
+                    # free supervised data to save GPU space
+                    del data, targets
                     # get unlabeled batch
                     try:
                         (u_data, u_t_data), _ = next(unsup_iter)
                     except StopIteration:
                         unsup_iter = iter(unsup_train_loader)
                         (u_data, u_t_data), _ = next(unsup_iter)
+                    # unsupervised forward and loss
                     u_data, u_t_data = u_data.to(device), u_t_data.to(device)
                     _, u_norm_embeds, _, sigma2s = model(u_data)
                     _, u_t_norm_embeds, _, _ = model(u_t_data)
@@ -123,15 +134,11 @@ def train_gcd(args):
                     loss = sup_loss + unsup_loss
                     loss.backward()
                     optim.step()
-                # statistics
-                _, preds = torch.max(logits, 1)
-                epoch_sup_loss = (sup_loss.item() * data.size(0) +
-                                  count * epoch_sup_loss) / (count + data.size(0))
-                epoch_unsup_loss = (unsup_loss.item() * data.size(0) +
-                                    count * epoch_unsup_loss) / (count + data.size(0))
-                epoch_acc = (torch.sum(preds == targets.data) +
-                             epoch_acc * count).double() / (count + data.size(0))
-                count += data.size(0)
+                    # unsupervised stats
+                    epoch_unsup_loss = (
+                        unsup_loss.item() * u_data.size(0) + unsup_count * epoch_unsup_loss
+                        ) / (unsup_count + u_data.size(0))
+                    unsup_count += u_data.size(0)
             if phase == "train":
                 scheduler.step()
                 writer.add_scalar("Average Train Supervised Loss", epoch_sup_loss, epoch)
