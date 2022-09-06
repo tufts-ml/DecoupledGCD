@@ -123,8 +123,6 @@ def train_gcd(args):
                 # unsupervised forward, loss, and backprop
                 unsup_loss = 0
                 if phase == "train":
-                    # free supervised data to save GPU space
-                    del data, targets
                     # get unlabeled batch
                     try:
                         (u_data, u_t_data), _ = next(unsup_iter)
@@ -161,12 +159,13 @@ def launch_parallel(rank, world_size, args):
     os.environ['MASTER_PORT'] = '12355'
     torch.distributed.init_process_group("gloo", rank=rank, world_size=world_size)
     args.device = rank
+    args.batch_size = args.batch_size // world_size
     train_gcd(args)
 
 
 if __name__ == "__main__":
     args = get_args()
-    use_parallel = True
+    use_parallel = False
     if not use_parallel:
         train_gcd(args)
     else:
