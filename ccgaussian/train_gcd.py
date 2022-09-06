@@ -109,13 +109,14 @@ def train_gcd(args):
             epoch_unsup_loss = 0.
             epoch_acc = 0.
             for data, targets in sup_loader:
-                # supervised forward and loss
+                optim.zero_grad()
+                # supervised forward, loss, and backward
                 data = (data.to(device))
                 targets = (targets.long().to(device))
-                optim.zero_grad()
                 with torch.set_grad_enabled(phase == "train"):
                     logits, norm_embeds, means, sigma2s = model(data)
                     sup_loss = sup_loss_func(logits, norm_embeds, means, sigma2s, targets)
+                    sup_loss.backward()
                 # supervised stats
                 _, preds = torch.max(logits, 1)
                 epoch_sup_loss = (sup_loss.item() * data.size(0) +
@@ -123,8 +124,7 @@ def train_gcd(args):
                 epoch_acc = (torch.sum(preds == targets.data) +
                              epoch_acc * sup_count).double() / (sup_count + data.size(0))
                 sup_count += data.size(0)
-                # unsupervised forward, loss, and backprop
-                unsup_loss = 0
+                # unsupervised data for training only
                 if phase == "train":
                     # get unlabeled batch
                     try:
@@ -132,20 +132,21 @@ def train_gcd(args):
                     except StopIteration:
                         unsup_iter = iter(unsup_train_loader)
                         (u_data, u_t_data), _ = next(unsup_iter)
-                    # unsupervised forward and loss
-                    u_data, u_t_data = u_data.to(device), u_t_data.to(device)
-                    _, u_norm_embeds, _, sigma2s = model(u_data)
-                    _, u_t_norm_embeds, _, _ = model(u_t_data)
-                    unsup_loss = unsup_loss_func(u_norm_embeds, u_t_norm_embeds, sigma2s)
-                    # backward and optimize
-                    loss = sup_loss + unsup_loss
-                    loss.backward()
-                    optim.step()
+                    # unsupervised forward, loss, and backward
+                    with torch.set_grad_enabled(True):
+                        u_data, u_t_data = u_data.to(device), u_t_data.to(device)
+                        _, u_norm_embeds, _, sigma2s = model(u_data)
+                        _, u_t_norm_embeds, _, _ = model(u_t_data)
+                        unsup_loss = unsup_loss_func(u_norm_embeds, u_t_norm_embeds, sigma2s)
+                        unsup_loss.backward()
                     # unsupervised stats
                     epoch_unsup_loss = (
                         unsup_loss.item() * u_data.size(0) + unsup_count * epoch_unsup_loss
                         ) / (unsup_count + u_data.size(0))
                     unsup_count += u_data.size(0)
+                # optimize
+                if phase == "train":
+                    optim.step()
             if phase == "train":
                 scheduler.step()
                 writer.add_scalar("Average Train Supervised Loss", epoch_sup_loss, epoch)
