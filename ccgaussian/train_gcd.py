@@ -16,7 +16,10 @@ from ccgaussian.model import DinoCCG
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str, default="NovelCraft", choices=["NovelCraft"])
-    parser.add_argument("--device", type=int, help="CUDA device index or unused for CPU")
+    # device parameters
+    device_group = parser.add_mutually_exclusive_group()
+    device_group.add_argument("--device", type=int, help="CUDA device index or unused for CPU")
+    device_group.add_argument("--parallel", action="store_true", help="Enable multi-GPU training")
     # model hyperparameters
     parser.add_argument("--e_mag", type=float, default=16, help="Embedding magnitued")
     # training hyperparameters
@@ -82,7 +85,7 @@ def train_gcd(args):
     scheduler = torch.optim.lr_scheduler.MultiStepLR(
         optim, milestones=args.lr_milestones, gamma=0.1)
     # convert model for parallel processing
-    if args.device is not None:
+    if args.parallel:
         model = DistributedDataParallel(model, [args.device])
     # init loss
     sup_loss_func = NDCCLoss(args.w_ccg, args.w_nll)
@@ -165,8 +168,7 @@ def launch_parallel(rank, world_size, args):
 
 if __name__ == "__main__":
     args = get_args()
-    use_parallel = False
-    if not use_parallel:
+    if not args.parallel:
         train_gcd(args)
     else:
         world_size = 2
