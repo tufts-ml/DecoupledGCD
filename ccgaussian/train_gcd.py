@@ -116,7 +116,8 @@ def train_gcd(args):
                 with torch.set_grad_enabled(phase == "train"):
                     logits, norm_embeds, means, sigma2s = model(data)
                     sup_loss = sup_loss_func(logits, norm_embeds, means, sigma2s, targets)
-                    sup_loss.backward()
+                    if phase == "train":
+                        sup_loss.backward()
                 # supervised stats
                 _, preds = torch.max(logits, 1)
                 epoch_sup_loss = (sup_loss.item() * data.size(0) +
