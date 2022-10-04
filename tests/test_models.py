@@ -24,10 +24,11 @@ class TestDinoCCG():
 
     def test_var_stability(self, model):
         norm_embeds = torch.zeros((input_shape[0], model.embed_len))
-        norm_embeds[:, :4] = 4
+        active_dims = 4
+        norm_embeds[:, :active_dims] = model.embed_mag / active_dims
         targets = torch.zeros((input_shape[0],), dtype=int)
         optimizer = SGD([
-            {"params": [model.sigma, model.deltas], "lr": 1e-4, "momentum": .9},
+            {"params": [model.sigma, model.deltas], "lr": 1e-3, "momentum": .9},
             {"params": [model.classifier.weight], "lr": 1e-1, "momentum": .9}])
         # generous loss threshold that should be easy to reach and stay under
         loss_thresh = -400

@@ -25,7 +25,7 @@ class NDCCLoss(torch.nn.Module):
 
     @staticmethod
     def nll_loss(norm_embeds, means, sigma2s, targets):
-        # negative log-likelihood loss, affects means and covaraiance
+        # negative log-likelihood loss, affects means and varaiance
         return torch.log(sigma2s).sum() / 2 + \
             NDCCLoss.mahalanobis_d(norm_embeds.detach(), means, sigma2s, targets)
 
