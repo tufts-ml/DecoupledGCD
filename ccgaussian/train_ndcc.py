@@ -110,14 +110,14 @@ def train_ndcc(args):
                               cnt * epoch_loss) / (cnt + data.size(0))
                 epoch_acc = (torch.sum(preds == targets.data) +
                              epoch_acc * cnt).double() / (cnt + data.size(0))
-                sigma2s_norm = (torch.linalg.vector_norm(sigma2s) * data.size(0) +
+                sigma2s_norm = (torch.mean(sigma2s) * data.size(0) +
                                 sigma2s_norm * cnt) / (cnt + data.size(0))
                 cnt += data.size(0)
             if phase == "train":
                 scheduler.step()
                 writer.add_scalar("Average Train Loss", epoch_loss, epoch)
                 writer.add_scalar("Average Train Acc", epoch_acc, epoch)
-                writer.add_scalar("Average Train Variance", sigma2s_norm, epoch)
+                writer.add_scalar("Average Variance Mean", sigma2s_norm, epoch)
             else:
                 writer.add_scalar("Average Valid Loss", epoch_loss, epoch)
                 writer.add_scalar("Average Valid Acc", epoch_acc, epoch)
