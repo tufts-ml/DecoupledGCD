@@ -31,9 +31,7 @@ def get_args():
     parser.add_argument("--momentum", type=float, default=0.9)
     parser.add_argument("--lr_milestones", default=[15, 25, 29])
     # loss hyperparameters
-    parser.add_argument("--w_ccg", type=float, default=2e-1,
-                        help="CCG loss weight, lambda in Eq. (23)")
-    parser.add_argument("--w_nll", type=float, default=1 / 4096,
+    parser.add_argument("--w_nll", type=float, default=2e-1,
                         help="Negative log-likelihood weight, gamma in Eq. (22)")
     args = parser.parse_args()
     # add dataset related args
@@ -76,7 +74,7 @@ def train_ndcc(args):
     scheduler = torch.optim.lr_scheduler.MultiStepLR(
         optim, milestones=args.lr_milestones, gamma=0.1)
     # init loss
-    loss_func = NDCCLoss(args.w_ccg, args.w_nll)
+    loss_func = NDCCLoss(args.w_nll)
     # init tensorboard
     writer = SummaryWriter()
     # model training
@@ -93,6 +91,7 @@ def train_ndcc(args):
             cnt = 0
             epoch_loss = 0.
             epoch_acc = 0.
+            sigma2s_norm = 0.
             for data, targets in dataloader:
                 # forward and loss
                 data = (data.to(device))
@@ -111,11 +110,14 @@ def train_ndcc(args):
                               cnt * epoch_loss) / (cnt + data.size(0))
                 epoch_acc = (torch.sum(preds == targets.data) +
                              epoch_acc * cnt).double() / (cnt + data.size(0))
+                sigma2s_norm = (torch.linalg.vector_norm(sigma2s) * data.size(0) +
+                                sigma2s_norm * cnt) / (cnt + data.size(0))
                 cnt += data.size(0)
             if phase == "train":
                 scheduler.step()
                 writer.add_scalar("Average Train Loss", epoch_loss, epoch)
                 writer.add_scalar("Average Train Acc", epoch_acc, epoch)
+                writer.add_scalar("Average Train Variance", sigma2s_norm, epoch)
             else:
                 writer.add_scalar("Average Valid Loss", epoch_loss, epoch)
                 writer.add_scalar("Average Valid Acc", epoch_acc, epoch)

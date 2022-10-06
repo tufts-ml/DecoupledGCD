@@ -39,7 +39,7 @@ def get_args():
     # loss hyperparameters
     parser.add_argument("--w_ccg", type=float, default=2e-1,
                         help="CCG loss weight, lambda in Eq. (23)")
-    parser.add_argument("--w_nll", type=float, default=1 / 4096,
+    parser.add_argument("--w_nll", type=float, default=2e-1,
                         help="Negative log-likelihood weight, gamma in Eq. (22)")
     args = parser.parse_args()
     # add dataset related args
