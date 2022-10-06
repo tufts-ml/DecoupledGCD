@@ -41,6 +41,8 @@ def get_args():
                         help="CCG loss weight, lambda in Eq. (23)")
     parser.add_argument("--w_nll", type=float, default=2e-1,
                         help="Negative log-likelihood weight, gamma in Eq. (22)")
+    parser.add_argument("--w_sup", type=float, default=.35,
+                        help="Supervised loss weight, making unsupervised weight 1 - w_sup")
     args = parser.parse_args()
     # add dataset related args
     if args.dataset == "NovelCraft":
@@ -115,7 +117,8 @@ def train_gcd(args):
                 targets = (targets.long().to(device))
                 with torch.set_grad_enabled(phase == "train"):
                     logits, norm_embeds, means, sigma2s = model(data)
-                    sup_loss = sup_loss_func(logits, norm_embeds, means, sigma2s, targets)
+                    sup_loss = args.w_sup * \
+                        sup_loss_func(logits, norm_embeds, means, sigma2s, targets)
                     if phase == "train":
                         sup_loss.backward()
                 # supervised stats
@@ -138,7 +141,8 @@ def train_gcd(args):
                         u_data, u_t_data = u_data.to(device), u_t_data.to(device)
                         _, u_norm_embeds, _, sigma2s = model(u_data)
                         _, u_t_norm_embeds, _, _ = model(u_t_data)
-                        unsup_loss = unsup_loss_func(u_norm_embeds, u_t_norm_embeds, sigma2s)
+                        unsup_loss = (1 - args.w_sup) * \
+                            unsup_loss_func(u_norm_embeds, u_t_norm_embeds, sigma2s)
                         unsup_loss.backward()
                     # unsupervised stats
                     epoch_unsup_loss = (

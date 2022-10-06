@@ -91,6 +91,7 @@ def train_ndcc(args):
             cnt = 0
             epoch_loss = 0.
             epoch_acc = 0.
+            epoch_nll = 0.
             sigma2s_norm = 0.
             for data, targets in dataloader:
                 # forward and loss
@@ -110,6 +111,8 @@ def train_ndcc(args):
                               cnt * epoch_loss) / (cnt + data.size(0))
                 epoch_acc = (torch.sum(preds == targets.data) +
                              epoch_acc * cnt).double() / (cnt + data.size(0))
+                epoch_nll = (NDCCLoss.nll_loss(norm_embeds, means, sigma2s, targets) +
+                             epoch_nll * cnt) / (cnt + data.size(0))
                 sigma2s_norm = (torch.mean(sigma2s) * data.size(0) +
                                 sigma2s_norm * cnt) / (cnt + data.size(0))
                 cnt += data.size(0)
@@ -117,10 +120,12 @@ def train_ndcc(args):
                 scheduler.step()
                 writer.add_scalar("Average Train Loss", epoch_loss, epoch)
                 writer.add_scalar("Average Train Acc", epoch_acc, epoch)
+                writer.add_scalar("Average Train NLL", epoch_nll, epoch)
                 writer.add_scalar("Average Variance Mean", sigma2s_norm, epoch)
             else:
                 writer.add_scalar("Average Valid Loss", epoch_loss, epoch)
                 writer.add_scalar("Average Valid Acc", epoch_acc, epoch)
+                writer.add_scalar("Average Valid NLL", epoch_nll, epoch)
     torch.save(model.state_dict(), Path(writer.get_logdir()) / f"{args.num_epochs}.pt")
 
 
