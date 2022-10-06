@@ -36,9 +36,7 @@ class TestDinoCCG():
         for _ in range(100):
             optimizer.zero_grad()
             means, sigma2s = model.gaussian_params()
-            loss_nll = NDCCLoss.nll_loss(norm_embeds, means, sigma2s, targets)
-            loss_md = NDCCLoss.md_loss(norm_embeds, means, sigma2s, targets)
-            loss = loss_nll + loss_md
+            loss = NDCCLoss.nll_loss(norm_embeds, means, sigma2s, targets)
             loss.backward()
             optimizer.step()
             if passed_loss_thresh and loss > loss_thresh:
