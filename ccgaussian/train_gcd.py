@@ -115,7 +115,7 @@ def train_gcd(args):
                 targets = (targets.long().to(device))
                 with torch.set_grad_enabled(phase == "train"):
                     logits, norm_embeds, means, sigma2s = model(data)
-                    sup_loss = sup_loss_func(logits, norm_embeds, means, sigma2s, targets)
+                    sup_loss = .35 * sup_loss_func(logits, norm_embeds, means, sigma2s, targets)
                     if phase == "train":
                         sup_loss.backward()
                 # supervised stats
@@ -138,7 +138,7 @@ def train_gcd(args):
                         u_data, u_t_data = u_data.to(device), u_t_data.to(device)
                         _, u_norm_embeds, _, sigma2s = model(u_data)
                         _, u_t_norm_embeds, _, _ = model(u_t_data)
-                        unsup_loss = unsup_loss_func(u_norm_embeds, u_t_norm_embeds, sigma2s)
+                        unsup_loss = .65 * unsup_loss_func(u_norm_embeds, u_t_norm_embeds, sigma2s)
                         unsup_loss.backward()
                     # unsupervised stats
                     epoch_unsup_loss = (
