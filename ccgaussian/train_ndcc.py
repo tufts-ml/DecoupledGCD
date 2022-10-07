@@ -14,6 +14,8 @@ from ccgaussian.model import DinoCCG
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str, default="NovelCraft", choices=["NovelCraft"])
+    # model label for logging
+    parser.add_argument("--label", type=str, default=None)
     # model hyperparameters
     parser.add_argument("--e_mag", type=float, default=16, help="Embedding magnitued")
     # training hyperparameters
@@ -78,7 +80,7 @@ def train_ndcc(args):
     # init loss
     loss_func = NDCCLoss(args.w_ccg, args.w_nll)
     # init tensorboard
-    writer = SummaryWriter()
+    writer = SummaryWriter(args.label)
     # model training
     for epoch in range(args.num_epochs):
         # Each epoch has a training and validation phase

@@ -16,6 +16,8 @@ from ccgaussian.model import DinoCCG
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str, default="NovelCraft", choices=["NovelCraft"])
+    # model label for logging
+    parser.add_argument("--label", type=str, default=None)
     # device parameters
     device_group = parser.add_mutually_exclusive_group()
     device_group.add_argument("--device", type=int, help="CUDA device index or unused for CPU")
@@ -93,7 +95,7 @@ def train_gcd(args):
     sup_loss_func = NDCCLoss(args.w_ccg, args.w_nll)
     unsup_loss_func = UnsupMDLoss(args.w_ccg)
     # init tensorboard
-    writer = SummaryWriter()
+    writer = SummaryWriter(args.label)
     # model training
     for epoch in range(args.num_epochs):
         # Each epoch has a training and validation phase
