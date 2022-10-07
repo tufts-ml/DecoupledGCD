@@ -121,12 +121,12 @@ def train_ndcc(args):
             if phase == "train":
                 scheduler.step()
                 writer.add_scalar("Average Train Loss", epoch_loss, epoch)
-                writer.add_scalar("Average Train Acc", epoch_acc, epoch)
+                writer.add_scalar("Average Train Accuracy", epoch_acc, epoch)
                 writer.add_scalar("Average Train NLL", epoch_nll, epoch)
                 writer.add_scalar("Average Variance Mean", sigma2s_norm, epoch)
             else:
                 writer.add_scalar("Average Valid Loss", epoch_loss, epoch)
-                writer.add_scalar("Average Valid Acc", epoch_acc, epoch)
+                writer.add_scalar("Average Valid Accuracy", epoch_acc, epoch)
                 writer.add_scalar("Average Valid NLL", epoch_nll, epoch)
     torch.save(model.state_dict(), Path(writer.get_logdir()) / f"{args.num_epochs}.pt")
 
