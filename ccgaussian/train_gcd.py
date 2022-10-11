@@ -112,6 +112,8 @@ def train_gcd(args):
             epoch_sup_loss = 0.
             epoch_unsup_loss = 0.
             epoch_acc = 0.
+            epoch_nll = 0.
+            sigma2s_mean = 0.
             for data, targets in sup_loader:
                 optim.zero_grad()
                 # supervised forward, loss, and backward
@@ -129,6 +131,10 @@ def train_gcd(args):
                                   sup_count * epoch_sup_loss) / (sup_count + data.size(0))
                 epoch_acc = (torch.sum(preds == targets.data) +
                              epoch_acc * sup_count).double() / (sup_count + data.size(0))
+                epoch_nll = (NDCCLoss.nll_loss(norm_embeds, means, sigma2s, targets) +
+                             epoch_nll * sup_count) / (sup_count + data.size(0))
+                sigma2s_mean = (torch.mean(sigma2s) * data.size(0) +
+                                sigma2s_mean * sup_count) / (sup_count + data.size(0))
                 sup_count += data.size(0)
                 # unsupervised data for training only
                 if phase == "train":
@@ -155,13 +161,15 @@ def train_gcd(args):
                 if phase == "train":
                     optim.step()
             if phase == "train":
+                phase_label = "Train"
                 scheduler.step()
-                writer.add_scalar("Average Train Supervised Loss", epoch_sup_loss, epoch)
-                writer.add_scalar("Average Train Unsupervised Loss", epoch_unsup_loss, epoch)
-                writer.add_scalar("Average Train Accuracy", epoch_acc, epoch)
             else:
-                writer.add_scalar("Average Valid Supervised Loss", epoch_sup_loss, epoch)
-                writer.add_scalar("Average Valid Accuracy", epoch_acc, epoch)
+                phase_label = "Valid"
+            writer.add_scalar(f"{phase_label}/Average Supervised Loss", epoch_sup_loss, epoch)
+            writer.add_scalar(f"{phase_label}/Average Unsupervised Loss", epoch_unsup_loss, epoch)
+            writer.add_scalar(f"{phase_label}/Average Accuracy", epoch_acc, epoch)
+            writer.add_scalar(f"{phase_label}/Average NLL", epoch_nll, epoch)
+            writer.add_scalar(f"{phase_label}/Average Variance Mean", sigma2s_mean, epoch)
     torch.save(model.state_dict(), Path(writer.get_logdir()) / f"{args.num_epochs}.pt")
 
 
