@@ -49,6 +49,9 @@ def get_args():
     # add dataset related args
     if args.dataset == "NovelCraft":
         args.num_classes = 5
+    # prepend runs folder to label if given
+    if args.label is not None:
+        args.label = "runs/" + args.label
     return args
 
 
