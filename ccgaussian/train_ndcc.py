@@ -34,8 +34,11 @@ def get_args():
     parser.add_argument("--lr_milestones", default=[15, 25, 29])
     # loss hyperparameters
     parser.add_argument("--w_nll", type=float, default=2e-1,
-                        help="Negative log-likelihood weight, gamma in Eq. (22)")
+                        help="Negative log-likelihood weight for embedding network")
     args = parser.parse_args()
+    # update CCG parameter learning rates to be unaffected by w_nll
+    args.lr_s /= args.w_nll
+    args.lr_d /= args.w_nll
     # add dataset related args
     if args.dataset == "NovelCraft":
         args.num_classes = 5
