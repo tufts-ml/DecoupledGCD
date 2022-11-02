@@ -14,7 +14,7 @@ class DinoCCG(nn.Module):
         # linear classification head
         self.classifier = nn.Linear(self.embed_len, num_classes)
         # variance lower bound to prevent very small Gaussians
-        self.var_min = .1
+        self.var_min = 1e-3
         # solve inverse of variance calculation so variance is set to init_var
         init_var = torch.Tensor([1])
         init_sigma = torch.log(torch.exp(torch.sqrt(init_var - self.var_min)) - 1)
