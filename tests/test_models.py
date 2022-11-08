@@ -28,7 +28,7 @@ class TestDinoCCG():
         norm_embeds[:, :active_dims] = model.embed_mag / active_dims
         targets = torch.zeros((input_shape[0],), dtype=int)
         optimizer = SGD([
-            {"params": [model.sigma, model.deltas], "lr": 1e-3, "momentum": .9},
+            {"params": [model.sigma, model.deltas], "lr": 1e-4, "momentum": 0},
             {"params": [model.classifier.weight], "lr": 1e-1, "momentum": .9}])
         # generous loss threshold that should be easy to reach and stay under
         loss_thresh = -400

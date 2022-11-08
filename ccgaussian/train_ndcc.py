@@ -26,9 +26,9 @@ def get_args():
                         help="Learning rate for embedding v(x)")
     parser.add_argument("--lr_c", type=float, default=1e-1,
                         help="Learning rate for linear classifier {w_y, b_y}")
-    parser.add_argument("--lr_s", type=float, default=1e-1,
+    parser.add_argument("--lr_s", type=float, default=1e-3,
                         help="Learning rate for sigma")
-    parser.add_argument("--lr_d", type=float, default=1e-3,
+    parser.add_argument("--lr_d", type=float, default=1e-4,
                         help="Learning rate for delta_j")
     parser.add_argument("--momentum", type=float, default=0.9)
     parser.add_argument("--lr_milestones", default=[15, 25, 29])
@@ -65,10 +65,12 @@ def train_ndcc(args):
             "params": model.dino.parameters(),
             "lr": args.lr_e,
             "weignt_decay": 5e-4,
+            "momentum": args.momentum,
         },
         {
             "params": model.classifier.parameters(),
             "lr": args.lr_c,
+            "momentum": args.momentum,
         },
         {
             "params": [model.sigma],
@@ -78,7 +80,7 @@ def train_ndcc(args):
             "params": [model.deltas],
             "lr": args.lr_d,
         },
-    ], momentum=args.momentum)
+    ])
     scheduler = torch.optim.lr_scheduler.MultiStepLR(
         optim, milestones=args.lr_milestones, gamma=0.1)
     # init loss
