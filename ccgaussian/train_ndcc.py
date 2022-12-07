@@ -16,8 +16,6 @@ def get_args():
     parser.add_argument("--dataset", type=str, default="NovelCraft", choices=["NovelCraft"])
     # model label for logging
     parser.add_argument("--label", type=str, default=None)
-    # model hyperparameters
-    parser.add_argument("--e_mag", type=float, default=16, help="Embedding magnitued")
     # training hyperparameters
     parser.add_argument("--num_epochs", type=int, default=30,
                         help="Number of training epochs")
@@ -58,7 +56,7 @@ def train_ndcc(args):
         valid_loader = novelcraft_dataloader("valid_norm", DINOTestTrans(), args.batch_size,
                                              balance_classes=False)
     # init model
-    model = DinoCCG(args.num_classes, args.e_mag).to(device)
+    model = DinoCCG(args.num_classes).to(device)
     # init optimizer
     optim = torch.optim.SGD([
         {

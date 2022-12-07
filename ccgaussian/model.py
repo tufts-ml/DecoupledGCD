@@ -1,13 +1,12 @@
 import torch
 import torch.nn as nn
-from torch.nn.functional import normalize, softplus
+from torch.nn.functional import softplus
 
 
 class DinoCCG(nn.Module):
-    def __init__(self, num_classes, embed_mag=16.) -> None:
+    def __init__(self, num_classes) -> None:
         super().__init__()
         self.num_classes = num_classes
-        self.embed_mag = embed_mag
         # pretrained DINO backbone
         self.dino = torch.hub.load('facebookresearch/dino:main', 'dino_vitb16')
         self.embed_len = self.dino.norm.normalized_shape[0]
@@ -31,7 +30,7 @@ class DinoCCG(nn.Module):
     def forward(self, x):
         # normalized DINO embeddings
         embeds = self.dino(x)
-        norm_embeds = self.embed_mag * normalize(embeds.view(embeds.shape[0], -1), dim=1)
+        norm_embeds = embeds.view(embeds.shape[0], -1)
         # classifier prediction
         logits = self.classifier(norm_embeds)
         means, sigma2s = self.gaussian_params()
