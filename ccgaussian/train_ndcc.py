@@ -22,13 +22,13 @@ def get_args():
     parser.add_argument("--num_epochs", type=int, default=30,
                         help="Number of training epochs")
     parser.add_argument("--batch_size", type=int, default=128)
-    parser.add_argument("--lr_e", type=float, default=1e-3,
+    parser.add_argument("--lr_e", type=float, default=1e-5,
                         help="Learning rate for embedding v(x)")
-    parser.add_argument("--lr_c", type=float, default=1e-1,
+    parser.add_argument("--lr_c", type=float, default=1e-3,
                         help="Learning rate for linear classifier {w_y, b_y}")
-    parser.add_argument("--lr_s", type=float, default=1e-3,
+    parser.add_argument("--lr_s", type=float, default=1e-5,
                         help="Learning rate for sigma")
-    parser.add_argument("--lr_d", type=float, default=1e-4,
+    parser.add_argument("--lr_d", type=float, default=1e-6,
                         help="Learning rate for delta_j")
     parser.add_argument("--momentum", type=float, default=0.9)
     parser.add_argument("--lr_milestones", default=[15, 25, 29])
