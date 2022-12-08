@@ -28,10 +28,10 @@ class DinoCCG(nn.Module):
         return means, sigma2s
 
     def forward(self, x):
-        # normalized DINO embeddings
-        embeds = self.dino(x)
-        norm_embeds = embeds.view(embeds.shape[0], -1)
+        # DINO embeddings
+        raw_embeds = self.dino(x)
+        embeds = raw_embeds.view(raw_embeds.shape[0], -1)
         # classifier prediction
-        logits = self.classifier(norm_embeds)
+        logits = self.classifier(embeds)
         means, sigma2s = self.gaussian_params()
-        return logits, norm_embeds, means, sigma2s
+        return logits, embeds, means, sigma2s
