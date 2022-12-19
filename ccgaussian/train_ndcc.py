@@ -110,7 +110,7 @@ def train_ndcc(args):
                     optim.step()
                 # collect novelty detection stats only if validation phase
                 else:
-                    novel_scores = novelty_md(norm_embeds, means, sigma2s)
+                    novel_scores = novelty_md(norm_embeds, means, sigma2s).detach().cpu()
                     epoch_novel_scores = torch.hstack([epoch_novel_scores, novel_scores])
                     epoch_novel_labels = torch.hstack([epoch_novel_labels, torch.Tensor(
                         [1 if phase == "valid_nov" else 0] * len(novel_scores))])
@@ -146,6 +146,7 @@ def train_ndcc(args):
         "hparam/val_loss": epoch_loss,
         "hparam/val_accuracy": epoch_acc,
         "hparam/val_nll": epoch_nll,
+        "hparam/val_auroc": epoch_auroc,
     })
     torch.save(model.state_dict(), Path(writer.get_logdir()) / f"{args.num_epochs}.pt")
 
