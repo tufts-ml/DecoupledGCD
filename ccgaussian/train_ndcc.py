@@ -17,26 +17,21 @@ def get_args():
     # model label for logging
     parser.add_argument("--label", type=str, default=None)
     # training hyperparameters
-    parser.add_argument("--num_epochs", type=int, default=30,
+    parser.add_argument("--num_epochs", type=int, default=50,
                         help="Number of training epochs")
     parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--lr_e", type=float, default=1e-5,
                         help="Learning rate for embedding v(x)")
     parser.add_argument("--lr_c", type=float, default=1e-3,
                         help="Learning rate for linear classifier {w_y, b_y}")
-    parser.add_argument("--lr_s", type=float, default=0,
-                        help="Learning rate for sigma")
-    parser.add_argument("--lr_d", type=float, default=0,
-                        help="Learning rate for delta_j")
+    parser.add_argument("--init_var", type=float, default=1,
+                        help="Initial variance")
     parser.add_argument("--momentum", type=float, default=0.9)
-    parser.add_argument("--lr_milestones", default=[15, 25, 29])
+    parser.add_argument("--lr_milestones", default=[25, 40, 45])
     # loss hyperparameters
     parser.add_argument("--w_nll", type=float, default=1e-2,
                         help="Negative log-likelihood weight for embedding network")
     args = parser.parse_args()
-    # update CCG parameter learning rates to be unaffected by w_nll
-    args.lr_s /= args.w_nll
-    args.lr_d /= args.w_nll
     # add dataset related args
     if args.dataset == "NovelCraft":
         args.num_classes = 5
@@ -56,7 +51,7 @@ def train_ndcc(args):
         valid_loader = novelcraft_dataloader("valid_norm", DINOTestTrans(), args.batch_size,
                                              balance_classes=False)
     # init model
-    model = DinoCCG(args.num_classes).to(device)
+    model = DinoCCG(args.num_classes, args.init_var).to(device)
     # init optimizer
     optim = torch.optim.SGD([
         {
@@ -69,14 +64,6 @@ def train_ndcc(args):
             "params": model.classifier.parameters(),
             "lr": args.lr_c,
             "momentum": args.momentum,
-        },
-        {
-            "params": [model.sigma],
-            "lr": args.lr_s,
-        },
-        {
-            "params": [model.deltas],
-            "lr": args.lr_d,
         },
     ])
     scheduler = torch.optim.lr_scheduler.MultiStepLR(
@@ -132,7 +119,16 @@ def train_ndcc(args):
             writer.add_scalar(f"{phase_label}/Average Loss", epoch_loss, epoch)
             writer.add_scalar(f"{phase_label}/Average Accuracy", epoch_acc, epoch)
             writer.add_scalar(f"{phase_label}/Average NLL", epoch_nll, epoch)
-            writer.add_scalar(f"{phase_label}/Average Variance Mean", sigma2s_mean, epoch)
+    writer.add_hparams({
+        "lr_e": args.lr_e,
+        "lr_c": args.lr_c,
+        "init_var": args.init_var,
+        "w_nll": args.w_nll,
+    }, {
+        "hparam/val_loss": epoch_loss,
+        "hparam/val_accuracy": epoch_acc,
+        "hparam/val_nll": epoch_nll,
+    })
     torch.save(model.state_dict(), Path(writer.get_logdir()) / f"{args.num_epochs}.pt")
 
 
