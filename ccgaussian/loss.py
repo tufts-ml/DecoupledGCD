@@ -40,3 +40,10 @@ class UnsupMDLoss(torch.nn.Module):
 
     def forward(self, norm_embeds_1, norm_embeds_2, sigma2s):
         return self.w_ccg * self.unsup_md_loss(norm_embeds_1, norm_embeds_2, sigma2s)
+
+
+def novelty_md(norm_embeds, means, sigma2s):
+    # goes from B x K x D to B
+    all_md = torch.sum((torch.unsqueeze(norm_embeds, dim=1) - means)**2 / sigma2s, dim=2) / \
+        (2 * norm_embeds.shape[0])
+    return torch.min(all_md, dim=1)[0]

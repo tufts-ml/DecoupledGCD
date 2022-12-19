@@ -1,13 +1,14 @@
 import argparse
 from pathlib import Path
 
+from sklearn.metrics import roc_auc_score
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
 from polycraft_nov_data.dataloader import novelcraft_dataloader
 
 from ccgaussian.dino_trans import DINOTestTrans
-from ccgaussian.loss import NDCCLoss
+from ccgaussian.loss import NDCCLoss, novelty_md
 from ccgaussian.model import DinoCCG
 
 
@@ -48,8 +49,10 @@ def train_ndcc(args):
     if args.dataset == "NovelCraft":
         train_loader = novelcraft_dataloader("train", DINOTestTrans(), args.batch_size,
                                              balance_classes=True)
-        valid_loader = novelcraft_dataloader("valid_norm", DINOTestTrans(), args.batch_size,
-                                             balance_classes=False)
+        valid_norm_loader = novelcraft_dataloader("valid_norm", DINOTestTrans(), args.batch_size,
+                                                  balance_classes=False)
+        valid_nov_loader = novelcraft_dataloader("valid_novel", DINOTestTrans(), args.batch_size,
+                                                 balance_classes=False)
     # init model
     model = DinoCCG(args.num_classes, args.init_var).to(device)
     # init optimizer
@@ -74,14 +77,19 @@ def train_ndcc(args):
     writer = SummaryWriter(args.label)
     # model training
     for epoch in range(args.num_epochs):
+        epoch_novel_scores = torch.Tensor([])
+        epoch_novel_labels = torch.Tensor([])
         # Each epoch has a training and validation phase
-        for phase in ["train", "val"]:
+        for phase in ["train", "val_norm", "val_nov"]:
             if phase == "train":
                 model.train()
                 dataloader = train_loader
+            elif phase == "val_norm":
+                model.eval()
+                dataloader = valid_norm_loader
             else:
                 model.eval()
-                dataloader = valid_loader
+                dataloader = valid_nov_loader
             # vars for tensorboard stats
             cnt = 0
             epoch_loss = 0.
@@ -100,6 +108,12 @@ def train_ndcc(args):
                 if phase == "train":
                     loss.backward()
                     optim.step()
+                # collect novelty detection stats only if validation phase
+                else:
+                    novel_scores = novelty_md(norm_embeds, means, sigma2s)
+                    epoch_novel_scores = torch.hstack([epoch_novel_scores, novel_scores])
+                    epoch_novel_labels = torch.hstack([epoch_novel_labels, torch.Tensor(
+                        [1 if phase == "valid_nov" else 0] * len(novel_scores))])
                 # statistics
                 _, preds = torch.max(logits, 1)
                 epoch_loss = (loss.item() * data.size(0) +
@@ -116,9 +130,13 @@ def train_ndcc(args):
                 scheduler.step()
             else:
                 phase_label = "Valid"
-            writer.add_scalar(f"{phase_label}/Average Loss", epoch_loss, epoch)
-            writer.add_scalar(f"{phase_label}/Average Accuracy", epoch_acc, epoch)
-            writer.add_scalar(f"{phase_label}/Average NLL", epoch_nll, epoch)
+            if phase != "val_nov":
+                writer.add_scalar(f"{phase_label}/Average Loss", epoch_loss, epoch)
+                writer.add_scalar(f"{phase_label}/Average Accuracy", epoch_acc, epoch)
+                writer.add_scalar(f"{phase_label}/Average NLL", epoch_nll, epoch)
+            else:
+                epoch_auroc = roc_auc_score(epoch_novel_labels, epoch_novel_scores)
+                writer.add_scalar(f"{phase_label}/NovDet AUROC", epoch_auroc, epoch)
     writer.add_hparams({
         "lr_e": args.lr_e,
         "lr_c": args.lr_c,
