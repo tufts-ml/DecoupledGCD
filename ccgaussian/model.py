@@ -12,7 +12,8 @@ class DinoCCG(nn.Module):
         # linear classification head
         self.classifier = nn.Linear(self.embed_len, num_classes)
         # class-conditional Gaussian parameters
-        self.sigma2s = torch.Tensor([variance] * self.embed_len)
+        self.sigma2s = nn.parameter.Parameter(
+            torch.Tensor([variance] * self.embed_len), requires_grad=False)
 
     def gaussian_params(self):
         # class-conditional Gaussian parameters
