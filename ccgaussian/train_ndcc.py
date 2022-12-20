@@ -20,7 +20,7 @@ def get_args():
     # training hyperparameters
     parser.add_argument("--num_epochs", type=int, default=50,
                         help="Number of training epochs")
-    parser.add_argument("--batch_size", type=int, default=4)
+    parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--lr_e", type=float, default=1e-5,
                         help="Learning rate for embedding v(x)")
     parser.add_argument("--lr_c", type=float, default=1e-3,
@@ -114,7 +114,7 @@ def train_ndcc(args):
                     novel_scores = novelty_md(norm_embeds, means, sigma2s).detach().cpu()
                     epoch_novel_scores = torch.hstack([epoch_novel_scores, novel_scores])
                     epoch_novel_labels = torch.hstack([epoch_novel_labels, torch.Tensor(
-                        [1 if phase == "valid_nov" else 0] * len(novel_scores))])
+                        [1 if phase == "val_nov" else 0] * len(novel_scores))])
                 # calculate statistics
                 if phase != "val_nov":
                     _, preds = torch.max(logits, 1)
