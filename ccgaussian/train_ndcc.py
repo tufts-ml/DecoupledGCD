@@ -103,7 +103,8 @@ def train_ndcc(args):
                 optim.zero_grad()
                 with torch.set_grad_enabled(phase == "train"):
                     logits, norm_embeds, means, sigma2s = model(data)
-                    loss = loss_func(logits, norm_embeds, means, sigma2s, targets)
+                    if phase != "val_nov":
+                        loss = loss_func(logits, norm_embeds, means, sigma2s, targets)
                 # backward and optimize only if in training phase
                 if phase == "train":
                     loss.backward()
@@ -115,15 +116,16 @@ def train_ndcc(args):
                     epoch_novel_labels = torch.hstack([epoch_novel_labels, torch.Tensor(
                         [1 if phase == "valid_nov" else 0] * len(novel_scores))])
                 # statistics
-                _, preds = torch.max(logits, 1)
-                epoch_loss = (loss.item() * data.size(0) +
-                              cnt * epoch_loss) / (cnt + data.size(0))
-                epoch_acc = (torch.sum(preds == targets.data) +
-                             epoch_acc * cnt).double() / (cnt + data.size(0))
-                epoch_nll = (NDCCLoss.nll_loss(norm_embeds, means, sigma2s, targets) +
-                             epoch_nll * cnt) / (cnt + data.size(0))
-                sigma2s_mean = (torch.mean(sigma2s) * data.size(0) +
-                                sigma2s_mean * cnt) / (cnt + data.size(0))
+                if phase != "val_nov":
+                    _, preds = torch.max(logits, 1)
+                    epoch_loss = (loss.item() * data.size(0) +
+                                  cnt * epoch_loss) / (cnt + data.size(0))
+                    epoch_acc = (torch.sum(preds == targets.data) +
+                                 epoch_acc * cnt).double() / (cnt + data.size(0))
+                    epoch_nll = (NDCCLoss.nll_loss(norm_embeds, means, sigma2s, targets) +
+                                 epoch_nll * cnt) / (cnt + data.size(0))
+                    sigma2s_mean = (torch.mean(sigma2s) * data.size(0) +
+                                    sigma2s_mean * cnt) / (cnt + data.size(0))
                 cnt += data.size(0)
             if phase == "train":
                 phase_label = "Train"
