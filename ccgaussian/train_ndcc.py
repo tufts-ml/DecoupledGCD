@@ -46,6 +46,7 @@ def train_ndcc(args):
     # choose device
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     # init dataloaders
+    valid_nov_loader = None
     if args.dataset == "NovelCraft":
         train_loader = novelcraft_dataloader("train", DINOTestTrans(), args.batch_size,
                                              balance_classes=True)
@@ -71,16 +72,25 @@ def train_ndcc(args):
     ])
     scheduler = torch.optim.lr_scheduler.MultiStepLR(
         optim, milestones=args.lr_milestones, gamma=0.1)
+    phases = ["train", "val_norm"]
+    if valid_nov_loader is not None:
+        phases.append("val_nov")
     # init loss
     loss_func = NDCCLoss(args.w_nll)
     # init tensorboard
     writer = SummaryWriter(args.label)
+    writer.add_hparams({
+        "lr_e": args.lr_e,
+        "lr_c": args.lr_c,
+        "init_var": args.init_var,
+        "w_nll": args.w_nll,
+    }, {},  run_name=".")
     # model training
     for epoch in range(args.num_epochs):
         epoch_novel_scores = torch.Tensor([])
         epoch_novel_labels = torch.Tensor([])
         # Each epoch has a training and validation phase
-        for phase in ["train", "val_norm", "val_nov"]:
+        for phase in phases:
             if phase == "train":
                 model.train()
                 dataloader = train_loader
@@ -109,8 +119,8 @@ def train_ndcc(args):
                 if phase == "train":
                     loss.backward()
                     optim.step()
-                # collect novelty detection stats only if validation phase
-                else:
+                # novelty detection stats in validation phase if there's a validation novel set
+                elif "val_nov" in phases:
                     novel_scores = novelty_md(norm_embeds, means, sigma2s).detach().cpu()
                     epoch_novel_scores = torch.hstack([epoch_novel_scores, novel_scores])
                     epoch_novel_labels = torch.hstack([epoch_novel_labels, torch.Tensor(
@@ -137,20 +147,20 @@ def train_ndcc(args):
                 writer.add_scalar(f"{phase_label}/Average Loss", epoch_loss, epoch)
                 writer.add_scalar(f"{phase_label}/Average Accuracy", epoch_acc, epoch)
                 writer.add_scalar(f"{phase_label}/Average NLL", epoch_nll, epoch)
+                if epoch == args.num_epochs - 1:
+                    writer.add_hparams({}, {
+                        "hparam/val_loss": epoch_loss,
+                        "hparam/val_accuracy": epoch_acc,
+                        "hparam/val_nll": epoch_nll,
+                    }, run_name=".")
         # determine validation AUROC after all phases
-        epoch_auroc = roc_auc_score(epoch_novel_labels, epoch_novel_scores)
-        writer.add_scalar(f"{phase_label}/NovDet AUROC", epoch_auroc, epoch)
-    writer.add_hparams({
-        "lr_e": args.lr_e,
-        "lr_c": args.lr_c,
-        "init_var": args.init_var,
-        "w_nll": args.w_nll,
-    }, {
-        "hparam/val_loss": epoch_loss,
-        "hparam/val_accuracy": epoch_acc,
-        "hparam/val_nll": epoch_nll,
-        "hparam/val_auroc": epoch_auroc,
-    })
+        if "val_nov" in phases:
+            epoch_auroc = roc_auc_score(epoch_novel_labels, epoch_novel_scores)
+            writer.add_scalar(f"{phase_label}/NovDet AUROC", epoch_auroc, epoch)
+            if epoch == args.num_epochs - 1:
+                writer.add_hparams({}, {
+                    "hparam/val_auroc": epoch_auroc,
+                }, run_name=".")
     torch.save(model.state_dict(), Path(writer.get_logdir()) / f"{args.num_epochs}.pt")
 
 
