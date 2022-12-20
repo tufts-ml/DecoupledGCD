@@ -20,7 +20,7 @@ def get_args():
     # training hyperparameters
     parser.add_argument("--num_epochs", type=int, default=50,
                         help="Number of training epochs")
-    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--lr_e", type=float, default=1e-5,
                         help="Learning rate for embedding v(x)")
     parser.add_argument("--lr_c", type=float, default=1e-3,
@@ -115,7 +115,7 @@ def train_ndcc(args):
                     epoch_novel_scores = torch.hstack([epoch_novel_scores, novel_scores])
                     epoch_novel_labels = torch.hstack([epoch_novel_labels, torch.Tensor(
                         [1 if phase == "valid_nov" else 0] * len(novel_scores))])
-                # statistics
+                # calculate statistics
                 if phase != "val_nov":
                     _, preds = torch.max(logits, 1)
                     epoch_loss = (loss.item() * data.size(0) +
@@ -132,13 +132,14 @@ def train_ndcc(args):
                 scheduler.step()
             else:
                 phase_label = "Valid"
+            # output statistics
             if phase != "val_nov":
                 writer.add_scalar(f"{phase_label}/Average Loss", epoch_loss, epoch)
                 writer.add_scalar(f"{phase_label}/Average Accuracy", epoch_acc, epoch)
                 writer.add_scalar(f"{phase_label}/Average NLL", epoch_nll, epoch)
-            else:
-                epoch_auroc = roc_auc_score(epoch_novel_labels, epoch_novel_scores)
-                writer.add_scalar(f"{phase_label}/NovDet AUROC", epoch_auroc, epoch)
+        # determine validation AUROC after all phases
+        epoch_auroc = roc_auc_score(epoch_novel_labels, epoch_novel_scores)
+        writer.add_scalar(f"{phase_label}/NovDet AUROC", epoch_auroc, epoch)
     writer.add_hparams({
         "lr_e": args.lr_e,
         "lr_c": args.lr_c,
