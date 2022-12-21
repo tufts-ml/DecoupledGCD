@@ -147,7 +147,7 @@ def train_ndcc(args):
                 writer.add_scalar(f"{phase_label}/Average Loss", epoch_loss, epoch)
                 writer.add_scalar(f"{phase_label}/Average Accuracy", epoch_acc, epoch)
                 writer.add_scalar(f"{phase_label}/Average NLL", epoch_nll, epoch)
-                if epoch == args.num_epochs - 1:
+                if epoch == args.num_epochs - 1 and phase == "val_norm":
                     writer.add_hparams({}, {
                         "hparam/val_loss": epoch_loss,
                         "hparam/val_accuracy": epoch_acc,
