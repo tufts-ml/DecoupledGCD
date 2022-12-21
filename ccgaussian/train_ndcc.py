@@ -155,7 +155,8 @@ def train_ndcc(args):
             writer.add_scalar(f"{phase_label}/NovDet AUROC", epoch_auroc, epoch)
             if epoch == args.num_epochs - 1:
                 metric_dict["hparam/val_auroc"] = epoch_auroc
-                # record hparams all at once to avoid Tensorboard issues
+                # record hparams all at once and after all other writer calls
+                # to avoid issues with Tensorboard updating current file
                 writer.add_hparams({
                     "lr_e": args.lr_e,
                     "lr_c": args.lr_c,
