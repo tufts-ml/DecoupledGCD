@@ -79,12 +79,8 @@ def train_ndcc(args):
     loss_func = NDCCLoss(args.w_nll)
     # init tensorboard
     writer = SummaryWriter(args.label)
-    writer.add_hparams({
-        "lr_e": args.lr_e,
-        "lr_c": args.lr_c,
-        "init_var": args.init_var,
-        "w_nll": args.w_nll,
-    }, {},  run_name=".")
+    # metric dict for recording hparam metrics
+    metric_dict = {}
     # model training
     for epoch in range(args.num_epochs):
         epoch_novel_scores = torch.Tensor([])
@@ -148,19 +144,24 @@ def train_ndcc(args):
                 writer.add_scalar(f"{phase_label}/Average Accuracy", epoch_acc, epoch)
                 writer.add_scalar(f"{phase_label}/Average NLL", epoch_nll, epoch)
                 if epoch == args.num_epochs - 1 and phase == "val_norm":
-                    writer.add_hparams({}, {
+                    metric_dict = {
                         "hparam/val_loss": epoch_loss,
                         "hparam/val_accuracy": epoch_acc,
                         "hparam/val_nll": epoch_nll,
-                    }, run_name=".")
+                    }
         # determine validation AUROC after all phases
         if "val_nov" in phases:
             epoch_auroc = roc_auc_score(epoch_novel_labels, epoch_novel_scores)
             writer.add_scalar(f"{phase_label}/NovDet AUROC", epoch_auroc, epoch)
             if epoch == args.num_epochs - 1:
-                writer.add_hparams({}, {
-                    "hparam/val_auroc": epoch_auroc,
-                }, run_name=".")
+                metric_dict["hparam/val_auroc"] = epoch_auroc
+                # record hparams all at once to avoid Tensorboard issues
+                writer.add_hparams({
+                    "lr_e": args.lr_e,
+                    "lr_c": args.lr_c,
+                    "init_var": args.init_var,
+                    "w_nll": args.w_nll,
+                }, metric_dict, run_name=".")
     torch.save(model.state_dict(), Path(writer.get_logdir()) / f"{args.num_epochs}.pt")
 
 
