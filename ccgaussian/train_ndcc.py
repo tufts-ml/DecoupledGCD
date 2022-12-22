@@ -28,7 +28,7 @@ def get_args():
     parser.add_argument("--init_var", type=float, default=1,
                         help="Initial variance")
     parser.add_argument("--momentum", type=float, default=0.9)
-    parser.add_argument("--lr_milestones", default=[25, 40, 45])
+    parser.add_argument("--lr_milestones", default=[30, 40, 45])
     # loss hyperparameters
     parser.add_argument("--w_nll", type=float, default=1e-2,
                         help="Negative log-likelihood weight for embedding network")
@@ -71,7 +71,7 @@ def train_ndcc(args):
         },
     ])
     scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        optim, milestones=args.lr_milestones, gamma=0.1)
+        optim, milestones=args.lr_milestones, gamma=0.5)
     phases = ["train", "val_norm"]
     if valid_nov_loader is not None:
         phases.append("val_nov")
