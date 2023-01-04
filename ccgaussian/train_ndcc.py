@@ -166,6 +166,7 @@ def train_ndcc(args):
                     "lr_e": args.lr_e,
                     "lr_c": args.lr_c,
                     "init_var": args.init_var,
+                    "end_var": args.end_var,
                     "w_nll": args.w_nll,
                 }, metric_dict, run_name=".")
     torch.save(model.state_dict(), Path(writer.get_logdir()) / f"{args.num_epochs}.pt")
