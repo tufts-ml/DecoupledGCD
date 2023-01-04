@@ -27,6 +27,9 @@ def get_args():
                         help="Learning rate for linear classifier {w_y, b_y}")
     parser.add_argument("--init_var", type=float, default=1,
                         help="Initial variance")
+    parser.add_argument("--end_var", type=float, default=3e-1,
+                        help="Final variance")
+    parser.add_argument("--var_milestone", default=[25])
     parser.add_argument("--momentum", type=float, default=0.9)
     parser.add_argument("--lr_milestones", default=[30, 40, 45])
     # loss hyperparameters
@@ -55,7 +58,7 @@ def train_ndcc(args):
         valid_nov_loader = novelcraft_dataloader("valid_novel", DINOTestTrans(), args.batch_size,
                                                  balance_classes=False)
     # init model
-    model = DinoCCG(args.num_classes, args.init_var).to(device)
+    model = DinoCCG(args.num_classes, args.init_var, args.end_var, args.var_milestone).to(device)
     # init optimizer
     optim = torch.optim.SGD([
         {
@@ -85,6 +88,8 @@ def train_ndcc(args):
     for epoch in range(args.num_epochs):
         epoch_novel_scores = torch.Tensor([])
         epoch_novel_labels = torch.Tensor([])
+        # update model variance
+        model.anneal_var(epoch)
         # Each epoch has a training and validation phase
         for phase in phases:
             if phase == "train":
