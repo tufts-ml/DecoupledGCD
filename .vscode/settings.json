@@ -1,5 +1,7 @@
 {
     "python.analysis.extraPaths": [
         "submodules/polycraft-novelty-data"
-    ]
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
 }
