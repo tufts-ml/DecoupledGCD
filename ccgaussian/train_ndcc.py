@@ -29,7 +29,7 @@ def get_args():
                         help="Initial variance")
     parser.add_argument("--end_var", type=float, default=3e-1,
                         help="Final variance")
-    parser.add_argument("--var_milestone", default=[25])
+    parser.add_argument("--var_milestone", default=25)
     parser.add_argument("--momentum", type=float, default=0.9)
     parser.add_argument("--lr_milestones", default=[30, 40, 45])
     # loss hyperparameters
