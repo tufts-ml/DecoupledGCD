@@ -1,6 +1,7 @@
 {
     "python.analysis.extraPaths": [
-        "submodules/polycraft-novelty-data"
+        "submodules/polycraft-novelty-data",
+        "submodules/GCDdatasets",
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true

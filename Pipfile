@@ -16,6 +16,7 @@ name = "pytorch_cu116"
 [packages]
 ccgaussian = {editable = true, path = "."}
 polycraft-nov-data = {editable = true, path = "./submodules/polycraft-novelty-data"}
+gcd-data = {editable = true, path = "./submodules/GCDdatasets"}
 
 [torch_cpu]
 torch = {index="pytorch_cpu"}
