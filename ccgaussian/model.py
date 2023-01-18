@@ -41,4 +41,4 @@ class DinoCCG(nn.Module):
         # update variance
         new_var = self.end_var + (self.init_var - self.end_var) * anneal_factor
         self.sigma2s = nn.parameter.Parameter(
-            torch.Tensor([new_var] * self.embed_len), requires_grad=False)
+            torch.Tensor([new_var] * self.embed_len), requires_grad=False).to(self.sigma2s.device)
