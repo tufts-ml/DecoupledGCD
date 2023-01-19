@@ -22,6 +22,9 @@ class TestDinoCCG():
 
     def test_anneal_var(self, model):
         assert torch.all(model.sigma2s == torch.Tensor([model.init_var] * model.embed_len))
+        model.anneal_var(model.var_milestone / 2)
+        assert torch.all(
+            model.sigma2s == torch.Tensor([(model.init_var + model.end_var) / 2] * model.embed_len))
         model.anneal_var(model.var_milestone)
         assert torch.all(model.sigma2s == torch.Tensor([model.end_var] * model.embed_len))
         model.anneal_var(model.var_milestone * 2)
