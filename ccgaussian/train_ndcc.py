@@ -158,7 +158,8 @@ def train_ndcc(args):
                 else:
                     cur_novel_scores = novelty_md(norm_embeds, means, sigma2s).detach().cpu()
                     novel_scores = torch.hstack([novel_scores, cur_novel_scores])
-                    novel_labels = torch.hstack([novel_labels, torch.logical_not(norm_mask).int()])
+                    novel_labels = torch.hstack(
+                        [novel_labels, torch.logical_not(norm_mask).int().detach().cpu()])
                 # calculate statistics
                 _, preds = torch.max(logits, 1)
                 epoch_loss = (loss.item() * data.size(0) +
