@@ -144,12 +144,13 @@ def train_ndcc(args):
                 with torch.set_grad_enabled(phase == "train"):
                     logits, norm_embeds, means, sigma2s = model(data)
                     if phase == "train":
-                        loss = loss_func(logits, norm_embeds, means, sigma2s, targets)
+                        # all true mask if training
+                        norm_mask = torch.ones((data.size(0),), dtype=torch.bool).to(device)
                     else:
                         # filter out novel examples from loss in non-training phases
-                        norm_mask = torch.isin(targets, normal_classes)
-                        loss = loss_func(logits[norm_mask], norm_embeds[norm_mask], means, sigma2s,
-                                         targets[norm_mask])
+                        norm_mask = torch.isin(targets, normal_classes).to(device)
+                    loss = loss_func(logits[norm_mask], norm_embeds[norm_mask], means, sigma2s,
+                                     targets[norm_mask])
                 # backward and optimize only if in training phase
                 if phase == "train":
                     loss.backward()
@@ -160,13 +161,14 @@ def train_ndcc(args):
                     novel_scores = torch.hstack([novel_scores, cur_novel_scores])
                     novel_labels = torch.hstack(
                         [novel_labels, torch.logical_not(norm_mask).int().detach().cpu()])
-                # calculate statistics
-                _, preds = torch.max(logits, 1)
+                # calculate statistics, masking novel classes
+                _, preds = torch.max(logits[norm_mask], 1)
                 epoch_loss = (loss.item() * data.size(0) +
                               cnt * epoch_loss) / (cnt + data.size(0))
-                epoch_acc = (torch.sum(preds == targets.data) +
+                epoch_acc = (torch.sum(preds == targets[norm_mask].data) +
                              epoch_acc * cnt).double() / (cnt + data.size(0))
-                epoch_nll = (NDCCLoss.nll_loss(norm_embeds, means, sigma2s, targets) +
+                epoch_nll = (NDCCLoss.nll_loss(
+                    norm_embeds[norm_mask], means, sigma2s, targets[norm_mask]) +
                              epoch_nll * cnt) / (cnt + data.size(0))
                 epoch_sigma2s = (torch.mean(sigma2s) * data.size(0) +
                                  epoch_sigma2s * cnt) / (cnt + data.size(0))
