@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+import random
 
 from sklearn.metrics import roc_auc_score
 import torch
@@ -70,6 +71,7 @@ def get_nd_dataloaders(args):
     args.num_labeled_classes = len(args.train_classes)
     args.num_unlabeled_classes = len(args.unlabeled_classes)
     # construct DataLoaders
+    # need to set num_workers=0 in Windows due to torch.multiprocessing pickling limitation
     dataloader_kwargs = {
         "batch_size": args.batch_size,
         "num_workers": 4,
@@ -108,8 +110,8 @@ def train_ndcc(args):
     phases = ["train", "valid", "test"]
     # init loss
     loss_func = NDCCLoss(args.w_nll)
-    # init tensorboard
-    writer = SummaryWriter(args.label)
+    # init tensorboard, with random comment to stop overlapping runs
+    writer = SummaryWriter(args.label, comment=str(random.randint(0, 9999)))
     # metric dict for recording hparam metrics
     metric_dict = {}
     # model training
@@ -192,13 +194,13 @@ def train_ndcc(args):
             if phase != "train":
                 auroc = roc_auc_score(novel_labels, novel_scores)
                 writer.add_scalar(f"{phase_label}/NovDet AUROC", auroc, epoch)
-                # record end of training stats
+                # record end of training stats, grouped as Metrics in Tensorboard
                 if epoch == args.num_epochs - 1:
                     metric_dict.update({
-                        f"hparam/{phase_label}_loss": epoch_loss,
-                        f"hparam/{phase_label}_accuracy": epoch_acc,
-                        f"hparam/{phase_label}_nll": epoch_nll,
-                        f"hparam/{phase_label}_auroc": auroc,
+                        f"Metrics/{phase_label}_loss": epoch_loss,
+                        f"Metrics/{phase_label}_accuracy": epoch_acc,
+                        f"Metrics/{phase_label}_nll": epoch_nll,
+                        f"Metrics/{phase_label}_auroc": auroc,
                     })
     # record hparams all at once and after all other writer calls
     # to avoid issues with Tensorboard changing output file
