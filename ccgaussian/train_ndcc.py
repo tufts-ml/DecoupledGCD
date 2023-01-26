@@ -196,6 +196,8 @@ def train_ndcc(args):
                 writer.add_scalar(f"{phase_label}/NovDet AUROC", auroc, epoch)
                 # record end of training stats, grouped as Metrics in Tensorboard
                 if epoch == args.num_epochs - 1:
+                    # note non-numeric values (NaN, None, ect.) will cause entry
+                    # to not be displayed in Tensorboard HPARAMS tab
                     metric_dict.update({
                         f"Metrics/{phase_label}_loss": epoch_loss,
                         f"Metrics/{phase_label}_accuracy": epoch_acc,
