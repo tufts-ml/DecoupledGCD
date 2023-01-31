@@ -75,6 +75,7 @@ def get_nd_dataloaders(args):
     dataloader_kwargs = {
         "batch_size": args.batch_size,
         "num_workers": 4,
+        "shuffle": True,
     }
     train_loader = DataLoader(dataset_dict["train_labeled"], **dataloader_kwargs)
     valid_loader = DataLoader(dataset_dict["test"], **dataloader_kwargs)
@@ -167,11 +168,12 @@ def train_ndcc(args):
                 _, preds = torch.max(logits[norm_mask], 1)
                 epoch_loss = (loss.item() * data.size(0) +
                               cnt * epoch_loss) / (cnt + data.size(0))
-                epoch_acc = (torch.sum(preds == targets[norm_mask].data) +
-                             epoch_acc * cnt).double() / (cnt + data.size(0))
-                epoch_nll = (NDCCLoss.nll_loss(
-                    norm_embeds[norm_mask], means, sigma2s, targets[norm_mask]) +
-                             epoch_nll * cnt) / (cnt + data.size(0))
+                if len(preds) > 0:
+                    epoch_acc = (torch.sum(preds == targets[norm_mask].data) +
+                                 epoch_acc * cnt).double() / (cnt + data.size(0))
+                    epoch_nll = (NDCCLoss.nll_loss(
+                        norm_embeds[norm_mask], means, sigma2s, targets[norm_mask]) +
+                        epoch_nll * cnt) / (cnt + data.size(0))
                 epoch_sigma2s = (torch.mean(sigma2s) * data.size(0) +
                                  epoch_sigma2s * cnt) / (cnt + data.size(0))
                 cnt += data.size(0)

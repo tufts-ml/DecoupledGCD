@@ -24,6 +24,8 @@ class NDCCLoss(torch.nn.Module):
             NDCCLoss.mahalanobis_d(norm_embeds, means, sigma2s, targets)
 
     def forward(self, logits, norm_embeds, means, sigma2s, targets):
+        if norm_embeds.shape[0] == 0:
+            return torch.scalar_tensor(0.)
         return self.ce_loss(logits, targets) + \
             self.w_nll * self.nll_loss(norm_embeds, means, sigma2s, targets)
 
