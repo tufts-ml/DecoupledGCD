@@ -39,7 +39,6 @@ def get_args():
     parser.add_argument("--end_var", type=float, default=3e-1,
                         help="Final variance")
     parser.add_argument("--var_milestone", default=25)
-    parser.add_argument("--momentum", type=float, default=0.9)
     parser.add_argument("--lr_milestones", default=[30, 40, 45])
     # loss hyperparameters
     parser.add_argument("--w_nll", type=float, default=1e-2,
@@ -93,17 +92,15 @@ def train_ndcc(args):
     model = DinoCCG(
         args.num_labeled_classes, args.init_var, args.end_var, args.var_milestone).to(device)
     # init optimizer
-    optim = torch.optim.SGD([
+    optim = torch.optim.AdamW([
         {
             "params": model.dino.parameters(),
             "lr": args.lr_e,
             "weignt_decay": 5e-4,
-            "momentum": args.momentum,
         },
         {
             "params": model.classifier.parameters(),
             "lr": args.lr_c,
-            "momentum": args.momentum,
         },
     ])
     scheduler = torch.optim.lr_scheduler.MultiStepLR(
