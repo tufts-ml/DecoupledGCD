@@ -62,7 +62,7 @@ def get_nd_dataloaders(args):
             test_loader: Normal and novel test set
             args: args updated with num_labeled_classes and num_unlabeled_classes
     """
-    train_trans = sim_gcd_train()
+    train_trans = sim_gcd_test()  # TODO fix, only using test for debugging
     test_trans = sim_gcd_test()
     args = get_class_splits(args)
     dataset_dict = get_datasets(args.dataset_name, train_trans, test_trans, args)[-1]
