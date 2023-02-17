@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from gcd_data.get_datasets import get_class_splits, get_datasets
 
 from ccgaussian.dino_trans import sim_gcd_train, sim_gcd_test
-from ccgaussian.loss import NDCCLoss, novelty_md
+from ccgaussian.loss import NDCCFixedLoss, novelty_md
 from ccgaussian.model import DinoCCG
 
 
@@ -107,7 +107,7 @@ def train_ndcc(args):
         optim, milestones=args.lr_milestones, gamma=0.5)
     phases = ["train", "valid", "test"]
     # init loss
-    loss_func = NDCCLoss(args.w_nll)
+    loss_func = NDCCFixedLoss(args.w_nll)
     # init tensorboard, with random comment to stop overlapping runs
     writer = SummaryWriter(args.label, comment=str(random.randint(0, 9999)))
     # metric dict for recording hparam metrics
@@ -168,7 +168,7 @@ def train_ndcc(args):
                 if len(preds) > 0:
                     epoch_acc = (torch.sum(preds == targets[norm_mask].data) +
                                  epoch_acc * cnt).double() / (cnt + data.size(0))
-                    epoch_nll = (NDCCLoss.nll_loss(
+                    epoch_nll = (NDCCFixedLoss.nll_loss(
                         norm_embeds[norm_mask], means, sigma2s, targets[norm_mask]) +
                         epoch_nll * cnt) / (cnt + data.size(0))
                 epoch_sigma2s = (torch.mean(sigma2s) * data.size(0) +
