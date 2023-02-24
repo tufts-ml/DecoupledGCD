@@ -4,6 +4,7 @@ import random
 
 from sklearn.metrics import roc_auc_score
 import torch
+import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -39,7 +40,7 @@ def get_args():
     parser.add_argument("--end_var", type=float, default=3e-1,
                         help="Final variance")
     parser.add_argument("--var_milestone", default=25)
-    parser.add_argument("--lr_milestones", default=[30, 40, 45])
+    parser.add_argument("--lr_warmup", default=10)
     # loss hyperparameters
     parser.add_argument("--w_nll", type=float, default=1e-2,
                         help="Negative log-likelihood weight for embedding network")
@@ -103,8 +104,15 @@ def train_ndcc(args):
             "lr": args.lr_c,
         },
     ])
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        optim, milestones=args.lr_milestones, gamma=0.5)
+    warmup_iters = args.lr_warmup * len(train_loader)
+    total_iters = args.num_epochs * len(train_loader)
+    scheduler = lr_scheduler.SequentialLR(
+        optim,
+        [
+            lr_scheduler.LinearLR(optim, start_factor=1/warmup_iters, total_iters=warmup_iters),
+            lr_scheduler.CosineAnnealingLR(optim, total_iters - warmup_iters)
+        ],
+        [warmup_iters])
     phases = ["train", "valid", "test"]
     # init loss
     loss_func = NDCCFixedLoss(args.w_nll)
@@ -155,6 +163,7 @@ def train_ndcc(args):
                 if phase == "train":
                     loss.backward()
                     optim.step()
+                    scheduler.step()
                 # novelty detection stats in non-training phase
                 else:
                     cur_novel_scores = novelty_md(norm_embeds, means, sigma2s).detach().cpu()
@@ -174,10 +183,9 @@ def train_ndcc(args):
                 epoch_sigma2s = (torch.mean(sigma2s) * data.size(0) +
                                  epoch_sigma2s * cnt) / (cnt + data.size(0))
                 cnt += data.size(0)
-            # get phase label and update LR scheduler
+            # get phase label
             if phase == "train":
                 phase_label = "Train"
-                scheduler.step()
             elif phase == "valid":
                 phase_label = "Valid"
             else:
