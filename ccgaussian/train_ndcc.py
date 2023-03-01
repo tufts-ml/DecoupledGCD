@@ -30,7 +30,7 @@ def get_args():
     # training hyperparameters
     parser.add_argument("--num_epochs", type=int, default=50,
                         help="Number of training epochs")
-    parser.add_argument("--batch_size", type=int, default=128)  # TODO test if can increase to 512
+    parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--lr_e", type=float, default=1e-5,
                         help="Learning rate for embedding v(x)")
     parser.add_argument("--lr_c", type=float, default=1e-3,
@@ -40,7 +40,6 @@ def get_args():
     parser.add_argument("--end_var", type=float, default=3e-1,
                         help="Final variance")
     parser.add_argument("--var_milestone", default=25)
-    parser.add_argument("--lr_warmup", default=10)  # TODO adjust with batch size to be ~10k steps
     # loss hyperparameters
     parser.add_argument("--w_nll", type=float, default=1e-2,
                         help="Negative log-likelihood weight for embedding network")
@@ -104,7 +103,10 @@ def train_ndcc(args):
             "lr": args.lr_c,
         },
     ])
-    warmup_iters = args.lr_warmup * len(train_loader)
+    # set learning rate warmup to take 1/4 of training time
+    lr_warmup = args.num_epochs // 4
+    # init learning rate scheduler
+    warmup_iters = lr_warmup * len(train_loader)
     total_iters = args.num_epochs * len(train_loader)
     scheduler = lr_scheduler.SequentialLR(
         optim,
