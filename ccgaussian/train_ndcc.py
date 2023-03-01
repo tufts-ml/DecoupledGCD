@@ -30,7 +30,7 @@ def get_args():
     # training hyperparameters
     parser.add_argument("--num_epochs", type=int, default=50,
                         help="Number of training epochs")
-    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--batch_size", type=int, default=128)  # TODO test if can increase to 512
     parser.add_argument("--lr_e", type=float, default=1e-5,
                         help="Learning rate for embedding v(x)")
     parser.add_argument("--lr_c", type=float, default=1e-3,
@@ -40,7 +40,7 @@ def get_args():
     parser.add_argument("--end_var", type=float, default=3e-1,
                         help="Final variance")
     parser.add_argument("--var_milestone", default=25)
-    parser.add_argument("--lr_warmup", default=10)
+    parser.add_argument("--lr_warmup", default=10)  # TODO adjust with batch size to be ~10k steps
     # loss hyperparameters
     parser.add_argument("--w_nll", type=float, default=1e-2,
                         help="Negative log-likelihood weight for embedding network")
@@ -176,10 +176,10 @@ def train_ndcc(args):
                               cnt * epoch_loss) / (cnt + data.size(0))
                 if len(preds) > 0:
                     epoch_acc = (torch.sum(preds == targets[norm_mask].data) +
-                                 epoch_acc * cnt).double() / (cnt + data.size(0))
+                                 epoch_acc * cnt).double() / (cnt + len(preds))
                     epoch_nll = (NDCCFixedLoss.nll_loss(
                         norm_embeds[norm_mask], means, sigma2s, targets[norm_mask]) +
-                        epoch_nll * cnt) / (cnt + data.size(0))
+                        epoch_nll * cnt) / (cnt + len(preds))
                 epoch_sigma2s = (torch.mean(sigma2s) * data.size(0) +
                                  epoch_sigma2s * cnt) / (cnt + data.size(0))
                 cnt += data.size(0)
