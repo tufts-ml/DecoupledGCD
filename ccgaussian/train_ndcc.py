@@ -47,6 +47,9 @@ def get_args():
     # prepend runs folder to label if given
     if args.label is not None:
         args.label = "runs/" + args.label
+    # adjust learning rates based on batch size
+    args.lr_e *= args.batch_size / 256
+    args.lr_c *= args.batch_size / 256
     return args
 
 
