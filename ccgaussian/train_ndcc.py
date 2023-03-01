@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 from gcd_data.get_datasets import get_class_splits, get_datasets
 
 from ccgaussian.dino_trans import sim_gcd_train, sim_gcd_test
-from ccgaussian.loss import NDCCFixedLoss, novelty_md
+from ccgaussian.loss import NDCCFixedLoss, novelty_sq_md
 from ccgaussian.model import DinoCCG
 
 
@@ -104,9 +104,9 @@ def train_ndcc(args):
         },
     ])
     # set learning rate warmup to take 1/4 of training time
-    lr_warmup = args.num_epochs // 4
+    warmup_epochs = max(args.num_epochs // 4, 1)
     # init learning rate scheduler
-    warmup_iters = lr_warmup * len(train_loader)
+    warmup_iters = warmup_epochs * len(train_loader)
     total_iters = args.num_epochs * len(train_loader)
     scheduler = lr_scheduler.SequentialLR(
         optim,
@@ -168,7 +168,7 @@ def train_ndcc(args):
                     scheduler.step()
                 # novelty detection stats in non-training phase
                 else:
-                    cur_novel_scores = novelty_md(norm_embeds, means, sigma2s).detach().cpu()
+                    cur_novel_scores = novelty_sq_md(norm_embeds, means, sigma2s).detach().cpu()
                     novel_scores = torch.hstack([novel_scores, cur_novel_scores])
                     novel_labels = torch.hstack(
                         [novel_labels, torch.logical_not(norm_mask).int().detach().cpu()])

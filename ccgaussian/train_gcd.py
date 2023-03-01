@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from polycraft_nov_data.dataloader import novelcraft_dataloader
 
 from ccgaussian.dino_trans import DINOTestTrans, DINOConsistentTrans
-from ccgaussian.loss import NDCCLoss, UnsupMDLoss
+from ccgaussian.loss import NDCCLoss
 from ccgaussian.model import DinoCCG
 
 
@@ -96,7 +96,7 @@ def train_gcd(args):
         model = DistributedDataParallel(model, [args.device])
     # init loss
     sup_loss_func = NDCCLoss(args.w_ccg, args.w_nll)
-    unsup_loss_func = UnsupMDLoss(args.w_ccg)
+    unsup_loss_func = None
     # init tensorboard
     writer = SummaryWriter(args.label)
     # model training
