@@ -90,7 +90,8 @@ def train_ndcc(args):
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     # init dataloaders
     train_loader, valid_loader, test_loader, args = get_nd_dataloaders(args)
-    normal_classes = torch.tensor(list(args.train_classes)).to(device)
+    # normal classes after target transform according to GCDdatasets API
+    normal_classes = torch.arange(args.num_labeled_classes).to(device)
     # init model
     model = DinoCCG(
         args.num_labeled_classes, args.init_var, args.end_var, args.var_milestone).to(device)
