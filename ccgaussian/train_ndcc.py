@@ -39,7 +39,7 @@ def get_args():
                         help="Initial variance")
     parser.add_argument("--end_var", type=float, default=3e-1,
                         help="Final variance")
-    parser.add_argument("--var_milestone", default=25)
+    parser.add_argument("--var_milestone", type=int, default=25)
     # loss hyperparameters
     parser.add_argument("--w_nll", type=float, default=1e-2,
                         help="Negative log-likelihood weight for embedding network")
