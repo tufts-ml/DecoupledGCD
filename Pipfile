@@ -9,11 +9,6 @@ verify_ssl = true
 name = "pytorch_cpu"
 
 [[source]]
-url = "https://download.pytorch.org/whl/cu110/"
-verify_ssl = true
-name = "pytorch_cu110"
-
-[[source]]
 url = "https://download.pytorch.org/whl/cu117/"
 verify_ssl = true
 name = "pytorch_cu117"
@@ -26,10 +21,6 @@ gcd-data = {editable = true, path = "./submodules/GCDdatasets"}
 [torch_cpu]
 torch = {index="pytorch_cpu"}
 torchvision = {index="pytorch_cpu"}
-
-[torch_cu110]
-torch = {index="pytorch_cu110"}
-torchvision = {index="pytorch_cu110"}
 
 [torch_cu117]
 torch = {index="pytorch_cu117"}
