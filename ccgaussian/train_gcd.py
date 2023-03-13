@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from polycraft_nov_data.dataloader import novelcraft_dataloader
 
-from ccgaussian.dino_trans import DINOTestTrans, DINOConsistentTrans
+from ccgaussian.augment import DINOTestTrans, DINOConsistentTrans
 from ccgaussian.loss import NDCCLoss
 from ccgaussian.model import DinoCCG
 

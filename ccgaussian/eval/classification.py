@@ -5,7 +5,7 @@ import torch
 
 from polycraft_nov_data.dataloader import novelcraft_dataloader
 
-from ccgaussian.dino_trans import DINOTestTrans
+from ccgaussian.augment import sim_gcd_test
 from ccgaussian.load import load_dino_ccg
 
 
@@ -33,7 +33,7 @@ def sq_mahalanobis_dist(embeds, means, sigma2s):
 if __name__ == "__main__":
     device = torch.device("cuda:0")
     model = load_dino_ccg().to(device)
-    valid_dataloader = novelcraft_dataloader("valid_norm", DINOTestTrans(), batch_size=128)
+    valid_dataloader = novelcraft_dataloader("valid_norm", sim_gcd_test(), batch_size=128)
     classifier_pred = torch.tensor([])
     ccg_pred = torch.tensor([])
     true_targets = torch.tensor([])
