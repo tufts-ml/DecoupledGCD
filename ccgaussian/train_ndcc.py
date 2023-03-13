@@ -76,7 +76,7 @@ def get_nd_dataloaders(args):
     # need to set num_workers=0 in Windows due to torch.multiprocessing pickling limitation
     dataloader_kwargs = {
         "batch_size": args.batch_size,
-        "num_workers": 0,
+        "num_workers": 4,
         "shuffle": True,
     }
     train_loader = DataLoader(dataset_dict["train_labeled"], **dataloader_kwargs)
