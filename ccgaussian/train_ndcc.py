@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from gcd_data.get_datasets import get_class_splits, get_datasets
 
-from ccgaussian.augment import byol_train, sim_gcd_test
+from ccgaussian.augment import sim_gcd_train, sim_gcd_test
 from ccgaussian.loss import NDCCFixedLoss, novelty_sq_md
 from ccgaussian.model import DinoCCG
 
@@ -65,7 +65,7 @@ def get_nd_dataloaders(args):
             test_loader: Normal and novel test set
             args: args updated with num_labeled_classes and num_unlabeled_classes
     """
-    train_trans = byol_train()
+    train_trans = sim_gcd_train()
     test_trans = sim_gcd_test()
     args = get_class_splits(args)
     dataset_dict = get_datasets(args.dataset_name, train_trans, test_trans, args)[-1]

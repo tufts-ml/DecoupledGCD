@@ -29,11 +29,12 @@ def byol_train():
 
 def sim_gcd_train():
     # SimGCD training transform
+    # uses random ColorJitter, while original implementation effectively didn't use it
     return transforms.Compose([
         transforms.Resize(IMAGE_SIZE, interpolation=INTERP),
         transforms.RandomCrop(IMAGE_SIZE),
         transforms.RandomHorizontalFlip(),
-        transforms.ColorJitter(),
+        transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)], p=0.8),
         dino_norm_trans(),
     ])
 
