@@ -38,6 +38,8 @@ class DinoCCG(nn.Module):
         # determine factors for interpolation between init and end
         epoch_factor = min(epoch_num / self.var_milestone, 1)
         anneal_factor = float((1 + torch.cos(torch.scalar_tensor(epoch_factor * torch.pi))) / 2)
-        # update variance
-        new_var = self.end_var + (self.init_var - self.end_var) * anneal_factor
+        # update variance, applying cos annealing in 1/x space used by loss then mapping to x space
+        recip_init = 1 / self.init_var
+        recip_end = 1 / self.end_var
+        new_var = 1 / (recip_end + (recip_init - recip_end) * anneal_factor)
         self.sigma2s[:] = new_var

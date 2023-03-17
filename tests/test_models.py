@@ -21,11 +21,17 @@ class TestDinoCCG():
         assert sigma2s.shape == (model.embed_len,)
 
     def test_anneal_var(self, model):
+        # start at init_var
         assert torch.all(model.sigma2s == torch.Tensor([model.init_var] * model.embed_len))
+        # middle is average of init and end in 1/x space projected back to x space
         model.anneal_var(model.var_milestone / 2)
-        assert torch.all(
-            model.sigma2s == torch.Tensor([(model.init_var + model.end_var) / 2] * model.embed_len))
+        assert torch.all(torch.isclose(
+            model.sigma2s,
+            torch.Tensor(
+                [1 / (((1 / model.init_var) + (1 / model.end_var)) / 2)] * model.embed_len)))
+        # end is end var
         model.anneal_var(model.var_milestone)
         assert torch.all(model.sigma2s == torch.Tensor([model.end_var] * model.embed_len))
+        # end value used for epochs after milestone
         model.anneal_var(model.var_milestone * 2)
         assert torch.all(model.sigma2s == torch.Tensor([model.end_var] * model.embed_len))
