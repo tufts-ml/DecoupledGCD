@@ -7,7 +7,6 @@ class DinoCCG(nn.Module):
         super().__init__()
         self.num_classes = num_classes
         # pretrained DINO backbone
-        # TODO ablation with model freezing
         self.dino = torch.hub.load('facebookresearch/dino:main', 'dino_vitb16')
         self.embed_len = self.dino.norm.normalized_shape[0]
         # linear classification head
