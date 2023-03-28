@@ -1,10 +1,9 @@
 import torch
 import torch.nn as nn
-from torch.nn.functional import softplus
 
 
 class DinoCCG(nn.Module):
-    def __init__(self, num_classes) -> None:
+    def __init__(self, num_classes, init_var=1, end_var=.3, var_milestone=25) -> None:
         super().__init__()
         self.num_classes = num_classes
         # pretrained DINO backbone
@@ -12,20 +11,18 @@ class DinoCCG(nn.Module):
         self.embed_len = self.dino.norm.normalized_shape[0]
         # linear classification head
         self.classifier = nn.Linear(self.embed_len, num_classes)
-        # variance lower bound to prevent very small Gaussians
-        self.var_min = 1e-3
-        # solve inverse of variance calculation so variance is set to init_var
-        init_var = torch.Tensor([1])
-        init_sigma = torch.log(torch.exp(torch.sqrt(init_var - self.var_min)) - 1)
         # class-conditional Gaussian parameters
-        self.sigma = nn.parameter.Parameter(init_sigma.type(torch.float32))
-        self.deltas = nn.parameter.Parameter(torch.zeros((self.embed_len,), dtype=torch.float32))
+        self.sigma2s = nn.parameter.Parameter(
+            torch.Tensor([init_var] * self.embed_len), requires_grad=False)
+        # variance annealing parameters
+        self.init_var = init_var
+        self.end_var = end_var
+        self.var_milestone = var_milestone
 
     def gaussian_params(self):
         # class-conditional Gaussian parameters
-        sigma2s = softplus(self.sigma + self.deltas)**2 + self.var_min
-        means = self.classifier.weight * sigma2s
-        return means, sigma2s
+        means = self.classifier.weight * self.sigma2s
+        return means, self.sigma2s
 
     def forward(self, x):
         # DINO embeddings
@@ -35,3 +32,13 @@ class DinoCCG(nn.Module):
         logits = self.classifier(embeds)
         means, sigma2s = self.gaussian_params()
         return logits, embeds, means, sigma2s
+
+    def anneal_var(self, epoch_num):
+        # determine factors for interpolation between init and end
+        epoch_factor = min(epoch_num / self.var_milestone, 1)
+        anneal_factor = float((1 + torch.cos(torch.scalar_tensor(epoch_factor * torch.pi))) / 2)
+        # update variance, applying cos annealing in 1/x space used by loss then mapping to x space
+        recip_init = 1 / self.init_var
+        recip_end = 1 / self.end_var
+        new_var = 1 / (recip_end + (recip_init - recip_end) * anneal_factor)
+        self.sigma2s[:] = new_var
