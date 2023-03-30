@@ -4,7 +4,6 @@ import random
 
 from sklearn.metrics import roc_auc_score
 import torch
-import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -13,6 +12,7 @@ from gcd_data.get_datasets import get_class_splits, get_datasets
 from ccgaussian.augment import sim_gcd_train, sim_gcd_test
 from ccgaussian.loss import NDCCFixedLoss, novelty_sq_md
 from ccgaussian.model import DinoCCG
+from ccgaussian.scheduler import warm_cos_scheduler
 
 
 def get_args():
@@ -107,18 +107,7 @@ def train_ndcc(args):
             "lr": args.lr_c,
         },
     ])
-    # set learning rate warmup to take 1/4 of training time
-    warmup_epochs = max(args.num_epochs // 4, 1)
-    # init learning rate scheduler
-    warmup_iters = warmup_epochs * len(train_loader)
-    total_iters = args.num_epochs * len(train_loader)
-    scheduler = lr_scheduler.SequentialLR(
-        optim,
-        [
-            lr_scheduler.LinearLR(optim, start_factor=1/warmup_iters, total_iters=warmup_iters),
-            lr_scheduler.CosineAnnealingLR(optim, total_iters - warmup_iters)
-        ],
-        [warmup_iters])
+    scheduler = warm_cos_scheduler(optim, args.num_epochs, train_loader)
     phases = ["train", "valid", "test"]
     # init loss
     loss_func = NDCCFixedLoss(args.w_nll)
