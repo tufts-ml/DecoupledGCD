@@ -14,9 +14,9 @@ class TestDinoCCG():
         return DinoCCG(num_classes)
 
     def test_forward(self, model):
-        logits, norm_embeds, means, sigma2s = model(torch.zeros(input_shape))
+        logits, embeds, means, sigma2s = model(torch.zeros(input_shape))
         assert logits.shape == (input_shape[0], num_classes)
-        assert norm_embeds.shape == (input_shape[0], model.embed_len)
+        assert embeds.shape == (input_shape[0], model.embed_len)
         assert means.shape == (num_classes, model.embed_len)
         assert sigma2s.shape == (model.embed_len,)
 

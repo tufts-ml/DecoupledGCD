@@ -10,11 +10,11 @@ num_classes = 5
 
 def dummy_data(num_samples):
     logits = torch.rand((num_samples, num_classes))
-    norm_embeds = torch.rand((num_samples, embed_dim))
+    embeds = torch.rand((num_samples, embed_dim))
     means = torch.rand((num_classes, embed_dim))
     sigma2s = torch.rand(embed_dim) + 1
     targets = torch.randint(0, num_classes, (num_samples,))
-    return logits, norm_embeds, means, sigma2s, targets
+    return logits, embeds, means, sigma2s, targets
 
 
 @pytest.mark.parametrize(
@@ -27,17 +27,17 @@ def dummy_data(num_samples):
 )
 class TestNDCCLoss():
     def test_empty(self, loss):
-        logits, norm_embeds, means, sigma2s, targets = dummy_data(0)
-        assert loss(logits, norm_embeds, means, sigma2s, targets) == 0
+        logits, embeds, means, sigma2s, targets = dummy_data(0)
+        assert loss(logits, embeds, means, sigma2s, targets) == 0
 
 
 def test_soft_consistent():
     loss = ccgaussian.loss.NDCCFixedLoss(w_nll=.05)
     soft_loss = ccgaussian.loss.NDCCFixedSoftLoss(w_nll=.05)
     num_samples = 8
-    logits, norm_embeds, means, sigma2s, targets = dummy_data(num_samples)
+    logits, embeds, means, sigma2s, targets = dummy_data(num_samples)
     soft_targets = torch.zeros((num_samples, num_classes))
     soft_targets[torch.arange(num_samples), targets] = 1
-    loss_val = loss(logits, norm_embeds, means, sigma2s, targets)
-    soft_loss_val = soft_loss(logits, norm_embeds, means, sigma2s, soft_targets)
+    loss_val = loss(logits, embeds, means, sigma2s, targets)
+    soft_loss_val = soft_loss(logits, embeds, means, sigma2s, soft_targets)
     assert torch.allclose(loss_val, soft_loss_val)

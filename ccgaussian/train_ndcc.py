@@ -145,14 +145,14 @@ def train_ndcc(args):
                 targets = targets.long().to(device)
                 optim.zero_grad()
                 with torch.set_grad_enabled(phase == "train"):
-                    logits, norm_embeds, means, sigma2s = model(data)
+                    logits, embeds, means, sigma2s = model(data)
                     if phase == "train":
                         # all true mask if training
                         norm_mask = torch.ones((data.size(0),), dtype=torch.bool).to(device)
                     else:
                         # filter out novel examples from loss in non-training phases
                         norm_mask = torch.isin(targets, normal_classes).to(device)
-                    loss = loss_func(logits[norm_mask], norm_embeds[norm_mask], means, sigma2s,
+                    loss = loss_func(logits[norm_mask], embeds[norm_mask], means, sigma2s,
                                      targets[norm_mask])
                 # backward and optimize only if in training phase
                 if phase == "train":
@@ -161,7 +161,7 @@ def train_ndcc(args):
                     scheduler.step()
                 # novelty detection stats in non-training phase
                 else:
-                    cur_novel_scores = novelty_sq_md(norm_embeds, means, sigma2s).detach().cpu()
+                    cur_novel_scores = novelty_sq_md(embeds, means, sigma2s).detach().cpu()
                     novel_scores = torch.hstack([novel_scores, cur_novel_scores])
                     novel_labels = torch.hstack(
                         [novel_labels, torch.logical_not(norm_mask).int().detach().cpu()])
@@ -173,7 +173,7 @@ def train_ndcc(args):
                     epoch_acc = (torch.sum(preds == targets[norm_mask].data) +
                                  epoch_acc * cnt).double() / (cnt + len(preds))
                     epoch_nll = (NDCCFixedLoss.nll_loss(
-                        norm_embeds[norm_mask], means, sigma2s, targets[norm_mask]) +
+                        embeds[norm_mask], means, sigma2s, targets[norm_mask]) +
                         epoch_nll * cnt) / (cnt + len(preds))
                 epoch_sigma2s = (torch.mean(sigma2s) * data.size(0) +
                                  epoch_sigma2s * cnt) / (cnt + data.size(0))
