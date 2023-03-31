@@ -1,18 +1,22 @@
 import pytest
 import torch
 
-from ccgaussian.loss import NDCCLoss
+import ccgaussian.loss
 
 
 embed_dim = 768
 num_classes = 5
 
 
+@pytest.mark.parametrize(
+    "loss",
+    [
+        ccgaussian.loss.NDCCLoss(w_nll=.05),
+        ccgaussian.loss.NDCCFixedLoss(w_nll=.05),
+        ccgaussian.loss.NDCCFixedSoftLoss(w_nll=.05),
+    ],
+)
 class TestNDCCLoss():
-    @pytest.fixture
-    def loss(self):
-        return NDCCLoss(w_nll=.05)
-
     def test_empty(self, loss):
         logits = torch.empty((0, num_classes))
         norm_embeds = torch.empty((0, embed_dim))
