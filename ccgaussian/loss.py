@@ -45,7 +45,8 @@ class NDCCFixedSoftLoss(NDCCLoss):
         if embeds.shape[0] == 0:
             return torch.scalar_tensor(0.)
         # validate soft_targets
-        assert torch.allclose(torch.sum(soft_targets, axis=1), torch.ones(soft_targets.shape[0]))
+        assert torch.allclose(torch.sum(soft_targets, axis=1),
+                              torch.ones(soft_targets.shape[0]).to(soft_targets.device))
         # take sum over clusters then mean over batch dimension
         md_reg = torch.sum(all_sq_md(embeds, means, sigma2s) * soft_targets, dim=1).mean() / 2
         return self.ce_loss(logits, soft_targets) + self.w_nll * md_reg

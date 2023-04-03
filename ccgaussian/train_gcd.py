@@ -90,7 +90,7 @@ def get_gcd_dataloaders(args):
 def init_gmm(model: DinoCCG, train_loader, device):
     novel_embeds = torch.empty((0, model.embed_len)).to(device)
     normal_embeds = torch.empty((0, model.embed_len)).to(device)
-    normal_targets = torch.Tensor([]).to(device)
+    normal_targets = torch.tensor([], dtype=int).to(device)
     for batch in train_loader:
         data, targets, _, norm_mask = batch
         # move data to device
@@ -168,7 +168,7 @@ def train_gcd(args):
                 novel_embeds = torch.empty((0, model.embed_len)).to(device)
                 novel_resp = torch.empty((0, num_classes)).to(device)
                 normal_embeds = torch.empty((0, model.embed_len)).to(device)
-                normal_targets = torch.Tensor([]).to(device)
+                normal_targets = torch.tensor([], dtype=int).to(device)
             for batch in dataloader:
                 # handle differing dataset formats
                 if phase == "train":
@@ -182,6 +182,7 @@ def train_gcd(args):
                 norm_mask = norm_mask.to(device)
                 # create normal soft targets
                 num_samples = data.shape[0]
+                # TODO a bunch of soft_targets staying as zeros
                 soft_targets = torch.zeros((num_samples, num_classes)).to(device)
                 soft_targets[torch.arange(num_samples).to(device)[norm_mask],
                              targets[norm_mask]] = 1
