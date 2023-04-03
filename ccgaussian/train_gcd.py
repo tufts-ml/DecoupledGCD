@@ -88,9 +88,9 @@ def get_gcd_dataloaders(args):
 
 
 def init_gmm(model: DinoCCG, train_loader, device):
-    novel_embeds = torch.empty((0, model.embed_len))
-    normal_embeds = torch.empty((0, model.embed_len))
-    normal_targets = torch.Tensor([])
+    novel_embeds = torch.empty((0, model.embed_len)).to(device)
+    normal_embeds = torch.empty((0, model.embed_len)).to(device)
+    normal_targets = torch.Tensor([]).to(device)
     for batch in train_loader:
         data, targets, _, norm_mask = batch
         # move data to device
@@ -165,10 +165,10 @@ def train_gcd(args):
             epoch_sigma2s = 0.
             # vars for m step
             if phase == "train":
-                novel_embeds = torch.empty((0, model.embed_len))
-                novel_resp = torch.empty((0, num_classes))
-                normal_embeds = torch.empty((0, model.embed_len))
-                normal_targets = torch.Tensor([])
+                novel_embeds = torch.empty((0, model.embed_len)).to(device)
+                novel_resp = torch.empty((0, num_classes)).to(device)
+                normal_embeds = torch.empty((0, model.embed_len)).to(device)
+                normal_targets = torch.Tensor([]).to(device)
             for batch in dataloader:
                 # handle differing dataset formats
                 if phase == "train":
@@ -189,9 +189,8 @@ def train_gcd(args):
                 with torch.set_grad_enabled(phase == "train"):
                     logits, embeds, means, sigma2s = model(data)
                     # create novel soft targets
-                    batch_novel_embeds = embeds[~norm_mask].detach().cpu().numpy()
-                    soft_targets[~norm_mask] = \
-                        torch.Tensor(gmm.deep_e_step(batch_novel_embeds)).to(device)
+                    soft_targets[~norm_mask] = torch.Tensor(
+                        gmm.deep_e_step(embeds[~norm_mask].detach().cpu().numpy())).to(device)
                     loss = loss_func(logits, embeds, means, sigma2s, soft_targets)
                 # backward and optimize only if in training phase
                 if phase == "train":
@@ -219,8 +218,12 @@ def train_gcd(args):
                     normal_targets = torch.hstack((normal_targets, targets[norm_mask]))
             # update SSGMM using classifier predictions for unlabeled data
             if phase == "train":
-                gmm.deep_m_step(normal_embeds, normal_targets, novel_embeds, novel_resp,
-                                float(model.sigma2s[0]))
+                gmm.deep_m_step(
+                    normal_embeds.detach().cpu().numpy(),
+                    normal_targets.detach().cpu().numpy(),
+                    novel_embeds.detach().cpu().numpy(),
+                    novel_resp.detach().cpu().numpy(),
+                    float(model.sigma2s[0].detach().cpu()))
             # get phase label
             if phase == "train":
                 phase_label = "Train"
