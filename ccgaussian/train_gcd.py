@@ -183,7 +183,7 @@ def train_gcd(args):
                 # create normal soft targets
                 num_samples = data.shape[0]
                 soft_targets = torch.zeros((num_samples, num_classes)).to(device)
-                soft_targets[torch.arange(num_samples)[norm_mask].to(device),
+                soft_targets[torch.arange(num_samples).to(device)[norm_mask],
                              targets[norm_mask]] = 1
                 # forward and loss
                 optim.zero_grad()
