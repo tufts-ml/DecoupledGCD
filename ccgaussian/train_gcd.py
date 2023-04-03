@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from gcd_cluster.ss_gmm import SSGMM
+from gcd_cluster.ss_gmm import DeepSSGMM
 
 from gcd_data.get_datasets import get_class_splits, get_datasets
 
@@ -102,10 +102,11 @@ def init_gmm(model: DinoCCG, train_loader, device):
             novel_embeds = torch.vstack((novel_embeds, embeds[~norm_mask]))
             normal_embeds = torch.vstack((normal_embeds, embeds[norm_mask]))
             normal_targets = torch.hstack((normal_targets, targets[norm_mask]))
-    return SSGMM(normal_embeds.cpu().numpy(),
-                 normal_targets.cpu().numpy(),
-                 novel_embeds.cpu().numpy(),
-                 model.num_classes)
+    return DeepSSGMM(normal_embeds.cpu().numpy(),
+                     normal_targets.cpu().numpy(),
+                     novel_embeds.cpu().numpy(),
+                     model.num_classes,
+                     model.init_var)
 
 
 def train_gcd(args):
@@ -144,8 +145,9 @@ def train_gcd(args):
     for epoch in range(args.num_epochs):
         # update model variance
         model.anneal_var(epoch)
-        # Each epoch has a training, validation, and test phase
+        # each epoch has a training, validation, and test phase
         for phase in phases:
+            # get dataloader
             if phase == "train":
                 model.train()
                 dataloader = train_loader
@@ -161,6 +163,12 @@ def train_gcd(args):
             epoch_acc = 0.
             epoch_nll = 0.
             epoch_sigma2s = 0.
+            # vars for m step
+            if phase == "train":
+                novel_embeds = torch.empty((0, model.embed_len))
+                novel_resp = torch.empty((0, num_classes))
+                normal_embeds = torch.empty((0, model.embed_len))
+                normal_targets = torch.Tensor([])
             for batch in dataloader:
                 # handle differing dataset formats
                 if phase == "train":
@@ -181,9 +189,9 @@ def train_gcd(args):
                 with torch.set_grad_enabled(phase == "train"):
                     logits, embeds, means, sigma2s = model(data)
                     # create novel soft targets
-                    novel_embeds = embeds.detach().cpu().numpy()
-                    soft_targets[torch.arange(num_samples)[~norm_mask]] = \
-                        torch.Tensor(gmm._e_step(novel_embeds)[1]).to(device)
+                    batch_novel_embeds = embeds[~norm_mask].detach().cpu().numpy()
+                    soft_targets[~norm_mask] = \
+                        torch.Tensor(gmm.deep_e_step(batch_novel_embeds)).to(device)
                     loss = loss_func(logits, embeds, means, sigma2s, soft_targets)
                 # backward and optimize only if in training phase
                 if phase == "train":
@@ -203,7 +211,16 @@ def train_gcd(args):
                 epoch_sigma2s = (torch.mean(sigma2s) * data.size(0) +
                                  epoch_sigma2s * cnt) / (cnt + data.size(0))
                 cnt += data.size(0)
-            # TODO update SSGMM using classifier predictions for unlabeled data
+                # cache data for m step
+                if phase == "train":
+                    novel_embeds = torch.vstack((novel_embeds, embeds[~norm_mask]))
+                    novel_resp = torch.vstack((novel_resp, soft_targets[~norm_mask]))
+                    normal_embeds = torch.vstack((normal_embeds, embeds[norm_mask]))
+                    normal_targets = torch.hstack((normal_targets, targets[norm_mask]))
+            # update SSGMM using classifier predictions for unlabeled data
+            if phase == "train":
+                gmm.deep_m_step(normal_embeds, normal_targets, novel_embeds, novel_resp,
+                                float(model.sigma2s[0]))
             # get phase label
             if phase == "train":
                 phase_label = "Train"
