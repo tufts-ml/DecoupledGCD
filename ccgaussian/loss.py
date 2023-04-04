@@ -53,10 +53,16 @@ class NDCCFixedSoftLoss(NDCCLoss):
                               torch.ones(soft_targets.shape[0]).to(soft_targets.device))
         # take sum over clusters then mean over batch dimension to get scalar
         md_reg = torch.sum(all_sq_md(embeds, means, sigma2s) * soft_targets, dim=1) / 2
-        norm_l = self.ce_loss(logits[norm_mask], soft_targets[norm_mask]) + \
-            self.w_nll * md_reg[norm_mask].mean()
-        novel_l = self.ce_loss(logits[~norm_mask], soft_targets[~norm_mask]) + \
-            self.w_nll * md_reg[~norm_mask].mean()
+        if norm_mask.sum() > 0:
+            norm_l = self.ce_loss(logits[norm_mask], soft_targets[norm_mask]) + \
+                self.w_nll * md_reg[norm_mask].mean()
+        else:
+            norm_l = 0
+        if (~norm_mask).sum() > 0:
+            novel_l = self.ce_loss(logits[~norm_mask], soft_targets[~norm_mask]) + \
+                self.w_nll * md_reg[~norm_mask].mean()
+        else:
+            novel_l = 0
         return norm_l + self.w_novel * novel_l
 
 
