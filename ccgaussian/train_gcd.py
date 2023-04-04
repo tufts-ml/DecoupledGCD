@@ -40,12 +40,14 @@ def get_args():
                         help="Initial variance")
     parser.add_argument("--end_var", type=float, default=3e-1,
                         help="Final variance")
-    parser.add_argument("--var_milestone", type=int, default=25)
+    parser.add_argument("--var_warmup", type=int, default=25)
     # loss hyperparameters
     parser.add_argument("--w_nll", type=float, default=1e-2,
                         help="Negative log-likelihood weight for embedding network")
     parser.add_argument("--w_novel", type=float, default=1,
                         help="Novel loss weight")
+    parser.add_argument("--novel_warmup", type=float, default=25,
+                        help="Novel loss weight warmup epochs")
     args = parser.parse_args()
     # prepend runs folder to label if given
     if args.label is not None:
@@ -120,7 +122,7 @@ def train_gcd(args):
     normal_classes = torch.arange(args.num_labeled_classes).to(device)
     # init model
     num_classes = args.num_labeled_classes + args.num_unlabeled_classes
-    model = DinoCCG(num_classes, args.init_var, args.end_var, args.var_milestone).to(device)
+    model = DinoCCG(num_classes, args.init_var, args.end_var, args.var_warmup).to(device)
     # init optimizer
     optim = torch.optim.AdamW([
         {
@@ -145,8 +147,9 @@ def train_gcd(args):
     gmm = init_gmm(model, train_loader, device)
     # model training
     for epoch in range(args.num_epochs):
-        # update model variance
+        # update model variance and loss w_novel
         model.anneal_var(epoch)
+        loss_func.anneal_w_novel(epoch)
         # each epoch has a training, validation, and test phase
         for phase in phases:
             # get dataloader
