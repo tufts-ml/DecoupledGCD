@@ -175,7 +175,7 @@ def train_gcd(args):
                     data, targets, uq_idxs, norm_mask = batch
                 else:
                     data, targets, uq_idxs = batch
-                    norm_mask = torch.isin(targets, normal_classes)
+                    norm_mask = torch.isin(targets.to(device), normal_classes)
                 # move data to device
                 data = data.to(device)
                 targets = targets.long().to(device)
