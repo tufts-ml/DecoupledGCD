@@ -4,13 +4,13 @@ import random
 
 import torch
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
 
 from gcd_cluster.ss_gmm import DeepSSGMM
 
 from gcd_data.get_datasets import get_class_splits, get_datasets
 
 from ccgaussian.augment import sim_gcd_train, sim_gcd_test
+from ccgaussian.logger import AverageWriter
 from ccgaussian.loss import NDCCFixedSoftLoss
 from ccgaussian.model import DinoCCG
 from ccgaussian.scheduler import warm_cos_scheduler
@@ -136,11 +136,11 @@ def train_gcd(args):
         },
     ])
     scheduler = warm_cos_scheduler(optim, args.num_epochs, train_loader)
-    phases = ["train", "valid", "test"]
+    phases = ["Train", "Valid", "Test"]
     # init loss
     loss_func = NDCCFixedSoftLoss(args.w_nll, args.w_novel)
     # init tensorboard, with random comment to stop overlapping runs
-    writer = SummaryWriter(args.label, comment=str(random.randint(0, 9999)))
+    av_writer = AverageWriter(args.label, comment=str(random.randint(0, 9999)))
     # metric dict for recording hparam metrics
     metric_dict = {}
     # initialze GMM
@@ -153,30 +153,24 @@ def train_gcd(args):
         # each epoch has a training, validation, and test phase
         for phase in phases:
             # get dataloader
-            if phase == "train":
+            if phase == "Train":
                 model.train()
                 dataloader = train_loader
-            elif phase == "valid":
+            elif phase == "Valid":
                 model.eval()
                 dataloader = valid_loader
             else:
                 model.eval()
                 dataloader = test_loader
-            # vars for tensorboard stats
-            cnt = 0
-            epoch_loss = 0.
-            epoch_acc = 0.
-            epoch_nll = 0.
-            epoch_sigma2s = 0.
             # vars for m step
-            if phase == "train":
+            if phase == "Train":
                 novel_embeds = torch.empty((0, model.embed_len)).to(device)
                 novel_resp = torch.empty((0, num_classes)).to(device)
                 normal_embeds = torch.empty((0, model.embed_len)).to(device)
                 normal_targets = torch.tensor([], dtype=int).to(device)
             for batch in dataloader:
                 # handle differing dataset formats
-                if phase == "train":
+                if phase == "Train":
                     data, targets, uq_idxs, norm_mask = batch
                 else:
                     data, targets, uq_idxs = batch
@@ -192,78 +186,71 @@ def train_gcd(args):
                              targets[norm_mask]] = 1
                 # forward and loss
                 optim.zero_grad()
-                with torch.set_grad_enabled(phase == "train"):
+                with torch.set_grad_enabled(phase == "Train"):
                     logits, embeds, means, sigma2s = model(data)
                     # create novel soft targets
                     soft_targets[~norm_mask] = torch.Tensor(
                         gmm.deep_e_step(embeds[~norm_mask].detach().cpu().numpy())).to(device)
                     loss = loss_func(logits, embeds, means, sigma2s, soft_targets, norm_mask)
                 # backward and optimize only if in training phase
-                if phase == "train":
+                if phase == "Train":
                     loss.backward()
                     optim.step()
                     scheduler.step()
                 # calculate statistics, masking novel classes
                 _, preds = torch.max(logits[norm_mask], 1)
-                epoch_loss = (loss.item() * data.size(0) +
-                              cnt * epoch_loss) / (cnt + data.size(0))
                 if len(preds) > 0:
-                    epoch_acc = (torch.sum(preds == targets[norm_mask].data) +
-                                 epoch_acc * cnt).double() / (cnt + len(preds))
-                    epoch_nll = (NDCCFixedSoftLoss.nll_loss(
-                        embeds[norm_mask], means, sigma2s, targets[norm_mask]) +
-                        epoch_nll * cnt) / (cnt + len(preds))
-                epoch_sigma2s = (torch.mean(sigma2s) * data.size(0) +
-                                 epoch_sigma2s * cnt) / (cnt + data.size(0))
-                cnt += data.size(0)
+                    av_writer.update(f"{phase}/Average Accuracy",
+                                     torch.sum(preds == targets[norm_mask].data),
+                                     len(preds))
+                    av_writer.update(
+                        f"{phase}/Average NLL",
+                        NDCCFixedSoftLoss.nll_loss(
+                            embeds[norm_mask], means, sigma2s, targets[norm_mask]),
+                        len(preds))
+                av_writer.update(f"{phase}/Average Loss",
+                                 loss.item() * data.size(0),
+                                 data.size(0))
+                # only output variance for training since other phases will match it
+                if phase == "Train":
+                    av_writer.update(f"{phase}/Average Variance Mean",
+                                     torch.mean(sigma2s) * data.size(0),
+                                     data.size(0))
                 # cache data for m step
-                if phase == "train":
+                if phase == "Train":
                     novel_embeds = torch.vstack((novel_embeds, embeds[~norm_mask]))
                     novel_resp = torch.vstack((novel_resp, soft_targets[~norm_mask]))
                     normal_embeds = torch.vstack((normal_embeds, embeds[norm_mask]))
                     normal_targets = torch.hstack((normal_targets, targets[norm_mask]))
             # update SSGMM using classifier predictions for unlabeled data
-            if phase == "train":
+            if phase == "Train":
                 gmm.deep_m_step(
                     normal_embeds.detach().cpu().numpy(),
                     normal_targets.detach().cpu().numpy(),
                     novel_embeds.detach().cpu().numpy(),
                     novel_resp.detach().cpu().numpy(),
                     float(model.sigma2s[0].detach().cpu()))
-            # get phase label
-            if phase == "train":
-                phase_label = "Train"
-            elif phase == "valid":
-                phase_label = "Valid"
-            else:
-                phase_label = "Test"
+            # record end of training stats, grouped as Metrics in Tensorboard
+            if phase != "Train" and epoch == args.num_epochs - 1:
+                # note non-numeric values (NaN, None, ect.) will cause entry
+                # to not be displayed in Tensorboard HPARAMS tab
+                metric_dict.update({
+                    f"Metrics/{phase}_loss": av_writer.scalars[f"{phase}/Average Loss"],
+                    f"Metrics/{phase}_accuracy": av_writer.scalars[f"{phase}/Average Accuracy"],
+                    f"Metrics/{phase}_nll": av_writer.scalars[f"{phase}/Average NLL"],
+                })
             # output statistics
-            writer.add_scalar(f"{phase_label}/Average Loss", epoch_loss, epoch)
-            writer.add_scalar(f"{phase_label}/Average Accuracy", epoch_acc, epoch)
-            writer.add_scalar(f"{phase_label}/Average NLL", epoch_nll, epoch)
-            # only output variance for training since other phases will match it
-            if phase == "train":
-                writer.add_scalar(f"{phase_label}/Average Variance Mean", epoch_sigma2s, epoch)
-            if phase != "train":
-                # record end of training stats, grouped as Metrics in Tensorboard
-                if epoch == args.num_epochs - 1:
-                    # note non-numeric values (NaN, None, ect.) will cause entry
-                    # to not be displayed in Tensorboard HPARAMS tab
-                    metric_dict.update({
-                        f"Metrics/{phase_label}_loss": epoch_loss,
-                        f"Metrics/{phase_label}_accuracy": epoch_acc,
-                        f"Metrics/{phase_label}_nll": epoch_nll,
-                    })
+            av_writer.write(epoch)
     # record hparams all at once and after all other writer calls
     # to avoid issues with Tensorboard changing output file
-    writer.add_hparams({
+    av_writer.writer.add_hparams({
         "lr_e": args.lr_e,
         "lr_c": args.lr_c,
         "init_var": args.init_var,
         "end_var": args.end_var,
         "w_nll": args.w_nll,
     }, metric_dict)
-    torch.save(model.state_dict(), Path(writer.get_logdir()) / f"{args.num_epochs}.pt")
+    torch.save(model.state_dict(), Path(av_writer.writer.get_logdir()) / f"{args.num_epochs}.pt")
 
 
 if __name__ == "__main__":
