@@ -44,6 +44,8 @@ def get_args():
     # loss hyperparameters
     parser.add_argument("--w_nll", type=float, default=1e-2,
                         help="Negative log-likelihood weight for embedding network")
+    parser.add_argument("--w_novel", type=float, default=1,
+                        help="Novel loss weight")
     args = parser.parse_args()
     # prepend runs folder to label if given
     if args.label is not None:
@@ -134,7 +136,7 @@ def train_gcd(args):
     scheduler = warm_cos_scheduler(optim, args.num_epochs, train_loader)
     phases = ["train", "valid", "test"]
     # init loss
-    loss_func = NDCCFixedSoftLoss(args.w_nll)
+    loss_func = NDCCFixedSoftLoss(args.w_nll, args.w_novel)
     # init tensorboard, with random comment to stop overlapping runs
     writer = SummaryWriter(args.label, comment=str(random.randint(0, 9999)))
     # metric dict for recording hparam metrics
@@ -192,7 +194,7 @@ def train_gcd(args):
                     # create novel soft targets
                     soft_targets[~norm_mask] = torch.Tensor(
                         gmm.deep_e_step(embeds[~norm_mask].detach().cpu().numpy())).to(device)
-                    loss = loss_func(logits, embeds, means, sigma2s, soft_targets)
+                    loss = loss_func(logits, embeds, means, sigma2s, soft_targets, norm_mask)
                 # backward and optimize only if in training phase
                 if phase == "train":
                     loss.backward()

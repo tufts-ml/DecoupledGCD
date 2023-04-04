@@ -40,16 +40,24 @@ class NDCCFixedLoss(NDCCLoss):
 
 
 class NDCCFixedSoftLoss(NDCCLoss):
+    def __init__(self, w_nll, w_novel) -> None:
+        super().__init__(w_nll)
+        self.w_novel = w_novel
+
     # NDCCLoss for soft labels and fixed variance
-    def forward(self, logits, embeds, means, sigma2s, soft_targets):
+    def forward(self, logits, embeds, means, sigma2s, soft_targets, norm_mask):
         if embeds.shape[0] == 0:
             return torch.scalar_tensor(0.)
         # validate soft_targets
         assert torch.allclose(torch.sum(soft_targets, axis=1),
                               torch.ones(soft_targets.shape[0]).to(soft_targets.device))
-        # take sum over clusters then mean over batch dimension
-        md_reg = torch.sum(all_sq_md(embeds, means, sigma2s) * soft_targets, dim=1).mean() / 2
-        return self.ce_loss(logits, soft_targets) + self.w_nll * md_reg
+        # take sum over clusters then mean over batch dimension to get scalar
+        md_reg = torch.sum(all_sq_md(embeds, means, sigma2s) * soft_targets, dim=1) / 2
+        norm_l = self.ce_loss(logits[norm_mask], soft_targets[norm_mask]) + \
+            self.w_nll * md_reg[norm_mask].mean()
+        novel_l = self.ce_loss(logits[~norm_mask], soft_targets[~norm_mask]) + \
+            self.w_nll * md_reg[~norm_mask].mean()
+        return norm_l + self.w_novel * novel_l
 
 
 def all_sq_md(embeds, means, sigma2s):
