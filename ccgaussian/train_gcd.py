@@ -209,13 +209,17 @@ def train_gcd(args):
                             embeds[norm_mask], means, sigma2s, targets[norm_mask]),
                         len(preds))
                 av_writer.update(f"{phase}/Average Loss",
-                                 loss.item() * data.size(0),
-                                 data.size(0))
-                # only output variance for training since other phases will match it
+                                 loss.item() * num_samples, num_samples)
+                # track mean pseudo-label confidence
+                av_writer.update(f"{phase}/Average Pseudo-label Confidence",
+                                 torch.max(soft_targets[~norm_mask], dim=1)[0].mean(),
+                                 (~norm_mask).sum())
+                # only output annealed values for training since other phases will match it
                 if phase == "Train":
                     av_writer.update(f"{phase}/Average Variance Mean",
-                                     torch.mean(sigma2s) * data.size(0),
-                                     data.size(0))
+                                     torch.sum(sigma2s), num_samples)
+                    av_writer.update(f"{phase}/Novel Weight",
+                                     loss_func.an_w_novel * num_samples, num_samples)
                 # cache data for m step
                 if phase == "Train":
                     novel_embeds = torch.vstack((novel_embeds, embeds[~norm_mask]))
@@ -249,6 +253,7 @@ def train_gcd(args):
         "init_var": args.init_var,
         "end_var": args.end_var,
         "w_nll": args.w_nll,
+        "w_novel": args.w_novel,
     }, metric_dict)
     torch.save(model.state_dict(), Path(av_writer.writer.get_logdir()) / f"{args.num_epochs}.pt")
 
