@@ -32,6 +32,6 @@ class AverageWriter():
         self.scalars[tag].update(scalar_value, cnt)
 
     def write(self, global_step):
-        for tag, av_meter in self.scalars:
+        for tag, av_meter in self.scalars.items():
             self.writer.add_scalar(tag, av_meter.avg, global_step)
         self.scalars = {}
