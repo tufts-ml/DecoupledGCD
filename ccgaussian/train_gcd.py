@@ -201,15 +201,15 @@ def train_gcd(args):
                 _, preds = torch.max(logits[norm_mask], 1)
                 if len(preds) > 0:
                     av_writer.update(f"{phase}/Average Accuracy",
-                                     torch.sum(preds == targets[norm_mask].data),
+                                     torch.mean(preds == targets[norm_mask].data),
                                      len(preds))
                     av_writer.update(
                         f"{phase}/Average NLL",
                         NDCCFixedSoftLoss.nll_loss(
-                            embeds[norm_mask], means, sigma2s, targets[norm_mask]),
+                            embeds[norm_mask], means, sigma2s, targets[norm_mask]) / len(preds),
                         len(preds))
                 av_writer.update(f"{phase}/Average Loss",
-                                 loss.item() * num_samples, num_samples)
+                                 loss.item(), num_samples)
                 # track mean pseudo-label confidence
                 av_writer.update(f"{phase}/Average Pseudo-label Confidence",
                                  torch.max(soft_targets[~norm_mask], dim=1)[0].mean(),
@@ -219,7 +219,7 @@ def train_gcd(args):
                     av_writer.update(f"{phase}/Average Variance Mean",
                                      torch.sum(sigma2s), num_samples)
                     av_writer.update(f"{phase}/Novel Weight",
-                                     loss_func.an_w_novel * num_samples, num_samples)
+                                     loss_func.an_w_novel, num_samples)
                 # cache data for m step
                 if phase == "Train":
                     novel_embeds = torch.vstack((novel_embeds, embeds[~norm_mask]))
