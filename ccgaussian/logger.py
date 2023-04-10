@@ -26,6 +26,9 @@ class AverageWriter():
         self.writer = SummaryWriter(*args, **kwargs)
         self.scalars = {}
 
+    def get_avg(self, tag):
+        return self.scalars[tag].avg
+
     def update(self, tag, scalar_value, cnt=1):
         """Update scalar. Use cnt=1 and only update once per epoch for non-mean values.
 

@@ -138,7 +138,7 @@ def train_gcd(args):
     scheduler = warm_cos_scheduler(optim, args.num_epochs, train_loader)
     phases = ["Train", "Valid", "Test"]
     # init loss
-    loss_func = NDCCFixedSoftLoss(args.w_nll, args.w_novel)
+    loss_func = NDCCFixedSoftLoss(args.w_nll, args.w_novel, args.novel_warmup)
     # init tensorboard, with random comment to stop overlapping runs
     av_writer = AverageWriter(args.label, comment=str(random.randint(0, 9999)))
     # metric dict for recording hparam metrics
@@ -217,7 +217,7 @@ def train_gcd(args):
                 # only output annealed values for training since other phases will match it
                 if phase == "Train":
                     av_writer.update(f"{phase}/Average Variance Mean",
-                                     torch.sum(sigma2s), num_samples)
+                                     torch.mean(sigma2s), num_samples)
                     av_writer.update(f"{phase}/Novel Weight",
                                      loss_func.an_w_novel, num_samples)
                 # cache data for m step
@@ -239,9 +239,9 @@ def train_gcd(args):
                 # note non-numeric values (NaN, None, ect.) will cause entry
                 # to not be displayed in Tensorboard HPARAMS tab
                 metric_dict.update({
-                    f"Metrics/{phase}_loss": av_writer.scalars[f"{phase}/Average Loss"],
-                    f"Metrics/{phase}_accuracy": av_writer.scalars[f"{phase}/Average Accuracy"],
-                    f"Metrics/{phase}_nll": av_writer.scalars[f"{phase}/Average NLL"],
+                    f"Metrics/{phase}_loss": av_writer.get_avg(f"{phase}/Average Loss"),
+                    f"Metrics/{phase}_accuracy": av_writer.get_avg(f"{phase}/Average Accuracy"),
+                    f"Metrics/{phase}_nll": av_writer.get_avg(f"{phase}/Average NLL"),
                 })
             # output statistics
             av_writer.write(epoch)
