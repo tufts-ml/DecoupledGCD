@@ -201,7 +201,7 @@ def train_gcd(args):
                 _, preds = torch.max(logits[norm_mask], 1)
                 if len(preds) > 0:
                     av_writer.update(f"{phase}/Average Accuracy",
-                                     torch.mean(preds == targets[norm_mask].data),
+                                     torch.mean((preds == targets[norm_mask]).float()),
                                      len(preds))
                     av_writer.update(
                         f"{phase}/Average NLL",
