@@ -52,7 +52,7 @@ class NDCCFixedSoftLoss(NDCCLoss):
         else:
             # determine factors for interpolation between init and end
             epoch_factor = min(epoch_num / self.novel_warmup, 1)
-            anneal_factor = float((1 + torch.cos(torch.scalar_tensor(epoch_factor * torch.pi))) / 2)
+            anneal_factor = float((1 - torch.cos(torch.scalar_tensor(epoch_factor * torch.pi))) / 2)
             self.an_w_novel = anneal_factor * self.w_novel
 
     # NDCCLoss for soft labels and fixed variance
