@@ -21,8 +21,8 @@ def dummy_data(num_samples):
 @pytest.mark.parametrize(
     "loss",
     [
-        ccgaussian.loss.NDCCLoss(w_nll=.05),
-        ccgaussian.loss.NDCCFixedLoss(w_nll=.05),
+        ccgaussian.loss.NDCCLoss(w_nll=.025),
+        ccgaussian.loss.NDCCFixedLoss(w_nll=.025),
     ],
 )
 class TestNDCCLoss():
@@ -32,14 +32,14 @@ class TestNDCCLoss():
 
 
 def test_empty_soft():
-    loss = ccgaussian.loss.NDCCFixedSoftLoss(w_nll=.05, w_novel=0)
+    loss = ccgaussian.loss.NDCCFixedSoftLoss(w_nll=.025, w_unlab=0)
     logits, embeds, means, sigma2s, targets, norm_mask = dummy_data(0)
     assert loss(logits, embeds, means, sigma2s, targets, norm_mask) == 0
 
 
 def test_soft_consistent():
-    loss = ccgaussian.loss.NDCCFixedLoss(w_nll=.05)
-    soft_loss = ccgaussian.loss.NDCCFixedSoftLoss(w_nll=.05, w_novel=0)
+    loss = ccgaussian.loss.NDCCFixedLoss(w_nll=.025)
+    soft_loss = ccgaussian.loss.NDCCFixedSoftLoss(w_nll=.025, w_unlab=0)
     num_samples = 8
     logits, embeds, means, sigma2s, targets, norm_mask = dummy_data(num_samples)
     soft_targets = torch.zeros((num_samples, num_classes))

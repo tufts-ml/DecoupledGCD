@@ -11,7 +11,7 @@ from gcd_data.get_datasets import get_class_splits, get_datasets
 
 from ccgaussian.augment import sim_gcd_train, sim_gcd_test
 from ccgaussian.logger import AverageWriter
-from ccgaussian.loss import NDCCFixedSoftLoss
+from ccgaussian.loss import NDCCFixedSoftLoss, novelty_sq_md
 from ccgaussian.model import DinoCCG
 from ccgaussian.scheduler import warm_cos_scheduler
 
@@ -42,10 +42,10 @@ def get_args():
                         help="Final variance")
     parser.add_argument("--var_warmup", type=int, default=25)
     # loss hyperparameters
-    parser.add_argument("--w_nll", type=float, default=1e-2,
+    parser.add_argument("--w_nll", type=float, default=.025,
                         help="Negative log-likelihood weight for embedding network")
-    parser.add_argument("--w_novel", type=float, default=.65,
-                        help="Novel loss weight, with normal loss multiplied by (1 - w_novel)")
+    parser.add_argument("--w_unlab", type=float, default=.65,
+                        help="Unlabeled loss weight, with labeled loss multiplied by (1 - w_unlab)")
     args = parser.parse_args()
     # prepend runs folder to label if given
     if args.label is not None:
@@ -136,7 +136,7 @@ def train_gcd(args):
     scheduler = warm_cos_scheduler(optim, args.num_epochs, train_loader)
     phases = ["Train", "Valid", "Test"]
     # init loss
-    loss_func = NDCCFixedSoftLoss(args.w_nll, args.w_novel)
+    loss_func = NDCCFixedSoftLoss(args.w_nll, args.w_unlab)
     # init tensorboard, with random comment to stop overlapping runs
     av_writer = AverageWriter(args.label, comment=str(random.randint(0, 9999)))
     # metric dict for recording hparam metrics
@@ -145,9 +145,8 @@ def train_gcd(args):
     gmm = init_gmm(model, train_loader, device)
     # model training
     for epoch in range(args.num_epochs):
-        # update model variance and loss w_novel
+        # update model variance
         model.anneal_var(epoch)
-        loss_func.anneal_w_novel(epoch)
         # each epoch has a training, validation, and test phase
         for phase in phases:
             # get dataloader
@@ -162,73 +161,83 @@ def train_gcd(args):
                 dataloader = test_loader
             # vars for m step
             if phase == "Train":
-                novel_embeds = torch.empty((0, model.embed_len)).to(device)
-                novel_resp = torch.empty((0, num_classes)).to(device)
-                normal_embeds = torch.empty((0, model.embed_len)).to(device)
-                normal_targets = torch.tensor([], dtype=int).to(device)
+                unlab_embeds = torch.empty((0, model.embed_len)).to(device)
+                unlab_resp = torch.empty((0, num_classes)).to(device)
+                label_embeds = torch.empty((0, model.embed_len)).to(device)
+                label_targets = torch.tensor([], dtype=int).to(device)
             for batch in dataloader:
-                # handle differing dataset formats
+                # use label mask to separate labeled and unlabeled for train batches
                 if phase == "Train":
-                    data, targets, uq_idxs, norm_mask = batch
+                    data, targets, uq_idxs, label_mask = batch
+                    label_types = ["Labeled", "Unlabeled"]
+                # use label mask to separate normal and novel for non-train batches
                 else:
                     data, targets, uq_idxs = batch
-                    norm_mask = torch.isin(targets.to(device), normal_classes)
+                    label_mask = torch.isin(targets.to(device), normal_classes)
+                    label_types = ["Normal", "Novel"]
                 # move data to device
                 data = data.to(device)
                 targets = targets.long().to(device)
-                norm_mask = norm_mask.to(device)
-                # create normal soft targets
+                label_mask = label_mask.to(device)
+                # create soft targets from available hard targets
                 num_samples = data.shape[0]
                 soft_targets = torch.zeros((num_samples, num_classes)).to(device)
-                soft_targets[torch.arange(num_samples).to(device)[norm_mask],
-                             targets[norm_mask]] = 1
+                soft_targets[torch.arange(num_samples).to(device)[label_mask],
+                             targets[label_mask]] = 1
                 # forward and loss
                 optim.zero_grad()
                 with torch.set_grad_enabled(phase == "Train"):
                     logits, embeds, means, sigma2s = model(data)
-                    # create novel soft targets
-                    soft_targets[~norm_mask] = torch.Tensor(
-                        gmm.deep_e_step(embeds[~norm_mask].detach().cpu().numpy())).to(device)
-                    loss = loss_func(logits, embeds, means, sigma2s, soft_targets, norm_mask)
+                    # create soft targets for unlabeled data
+                    soft_targets[~label_mask] = torch.Tensor(
+                        gmm.deep_e_step(embeds[~label_mask].detach().cpu().numpy())).to(device)
+                    loss = loss_func(logits, embeds, means, sigma2s, soft_targets, label_mask)
                 # backward and optimize only if in training phase
                 if phase == "Train":
                     loss.backward()
                     optim.step()
                     scheduler.step()
-                # calculate statistics, masking novel classes
-                _, preds = torch.max(logits[norm_mask], 1)
-                if len(preds) > 0:
-                    av_writer.update(f"{phase}/Average Accuracy",
-                                     torch.mean((preds == targets[norm_mask]).float()),
-                                     len(preds))
-                    av_writer.update(
-                        f"{phase}/Average NLL",
-                        NDCCFixedSoftLoss.nll_loss(
-                            embeds[norm_mask], means, sigma2s, targets[norm_mask]) / len(preds),
-                        len(preds))
+                # record non-class specific statistics
                 av_writer.update(f"{phase}/Average Loss",
                                  loss.item(), num_samples)
-                # track mean pseudo-label confidence
-                av_writer.update(f"{phase}/Average Pseudo-label Confidence",
-                                 torch.max(soft_targets[~norm_mask], dim=1)[0].mean(),
-                                 (~norm_mask).sum())
+                # calculate statistics masking unlabeled or novel data
+                if label_mask.sum() > 0:
+                    _, preds = torch.max(logits[label_mask], 1)
+                    av_writer.update(f"{phase}/Average {label_types[0]} Accuracy",
+                                     torch.mean((preds == targets[label_mask]).float()),
+                                     label_mask.sum())
+                    av_writer.update(f"{phase}/Average Min Sq MD {label_types[0]}",
+                                     novelty_sq_md(embeds[label_mask], means, sigma2s).mean(),
+                                     label_mask.sum())
+                # calculate statistics masking labeled or normal data
+                if (~label_mask).sum() > 0:
+                    av_writer.update(f"{phase}/Average {label_types[1]} Cross-Entropy",
+                                     loss_func.ce_loss(logits[~label_mask],
+                                                       soft_targets[~label_mask]),
+                                     (~label_mask).sum())
+                    av_writer.update(f"{phase}/Average {label_types[1]} Pseudo-label Confidence",
+                                     torch.max(soft_targets[~label_mask], dim=1)[0].mean(),
+                                     (~label_mask).sum())
+                    av_writer.update(f"{phase}/Average Min Sq MD {label_types[1]}",
+                                     novelty_sq_md(embeds[~label_mask], means, sigma2s).mean(),
+                                     (~label_mask).sum())
                 # only output annealed values for training since other phases will match it
                 if phase == "Train":
                     av_writer.update(f"{phase}/Average Variance Mean",
                                      torch.mean(sigma2s), num_samples)
                 # cache data for m step
                 if phase == "Train":
-                    novel_embeds = torch.vstack((novel_embeds, embeds[~norm_mask]))
-                    novel_resp = torch.vstack((novel_resp, soft_targets[~norm_mask]))
-                    normal_embeds = torch.vstack((normal_embeds, embeds[norm_mask]))
-                    normal_targets = torch.hstack((normal_targets, targets[norm_mask]))
+                    unlab_embeds = torch.vstack((unlab_embeds, embeds[~label_mask]))
+                    unlab_resp = torch.vstack((unlab_resp, soft_targets[~label_mask]))
+                    label_embeds = torch.vstack((label_embeds, embeds[label_mask]))
+                    label_targets = torch.hstack((label_targets, targets[label_mask]))
             # update SSGMM using classifier predictions for unlabeled data
             if phase == "Train":
                 gmm.deep_m_step(
-                    normal_embeds.detach().cpu().numpy(),
-                    normal_targets.detach().cpu().numpy(),
-                    novel_embeds.detach().cpu().numpy(),
-                    novel_resp.detach().cpu().numpy(),
+                    label_embeds.detach().cpu().numpy(),
+                    label_targets.detach().cpu().numpy(),
+                    unlab_embeds.detach().cpu().numpy(),
+                    unlab_resp.detach().cpu().numpy(),
                     float(model.sigma2s[0].detach().cpu()))
             # record end of training stats, grouped as Metrics in Tensorboard
             if phase != "Train" and epoch == args.num_epochs - 1:
@@ -249,7 +258,7 @@ def train_gcd(args):
         "init_var": args.init_var,
         "end_var": args.end_var,
         "w_nll": args.w_nll,
-        "w_novel": args.w_novel,
+        "w_unlab": args.w_unlab,
     }, metric_dict)
     torch.save(model.state_dict(), Path(av_writer.writer.get_logdir()) / f"{args.num_epochs}.pt")
 
