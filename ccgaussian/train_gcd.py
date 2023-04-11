@@ -44,10 +44,8 @@ def get_args():
     # loss hyperparameters
     parser.add_argument("--w_nll", type=float, default=1e-2,
                         help="Negative log-likelihood weight for embedding network")
-    parser.add_argument("--w_novel", type=float, default=1,
-                        help="Novel loss weight")
-    parser.add_argument("--novel_warmup", type=float, default=25,
-                        help="Novel loss weight warmup epochs")
+    parser.add_argument("--w_novel", type=float, default=.65,
+                        help="Novel loss weight, with normal loss multiplied by (1 - w_novel)")
     args = parser.parse_args()
     # prepend runs folder to label if given
     if args.label is not None:
@@ -138,7 +136,7 @@ def train_gcd(args):
     scheduler = warm_cos_scheduler(optim, args.num_epochs, train_loader)
     phases = ["Train", "Valid", "Test"]
     # init loss
-    loss_func = NDCCFixedSoftLoss(args.w_nll, args.w_novel, args.novel_warmup)
+    loss_func = NDCCFixedSoftLoss(args.w_nll, args.w_novel)
     # init tensorboard, with random comment to stop overlapping runs
     av_writer = AverageWriter(args.label, comment=str(random.randint(0, 9999)))
     # metric dict for recording hparam metrics
@@ -218,8 +216,6 @@ def train_gcd(args):
                 if phase == "Train":
                     av_writer.update(f"{phase}/Average Variance Mean",
                                      torch.mean(sigma2s), num_samples)
-                    av_writer.update(f"{phase}/Novel Weight",
-                                     loss_func.an_w_novel, num_samples)
                 # cache data for m step
                 if phase == "Train":
                     novel_embeds = torch.vstack((novel_embeds, embeds[~norm_mask]))

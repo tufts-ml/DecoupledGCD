@@ -40,20 +40,9 @@ class NDCCFixedLoss(NDCCLoss):
 
 
 class NDCCFixedSoftLoss(NDCCLoss):
-    def __init__(self, w_nll, w_novel, novel_warmup=0) -> None:
+    def __init__(self, w_nll, w_novel) -> None:
         super().__init__(w_nll)
         self.w_novel = w_novel
-        self.novel_warmup = novel_warmup
-        self.anneal_w_novel(0)
-
-    def anneal_w_novel(self, epoch_num):
-        if self.novel_warmup == 0:
-            self.an_w_novel = self.w_novel
-        else:
-            # determine factors for interpolation between init and end
-            epoch_factor = min(epoch_num / self.novel_warmup, 1)
-            anneal_factor = float((1 - torch.cos(torch.scalar_tensor(epoch_factor * torch.pi))) / 2)
-            self.an_w_novel = anneal_factor * self.w_novel
 
     # NDCCLoss for soft labels and fixed variance
     def forward(self, logits, embeds, means, sigma2s, soft_targets, norm_mask):
@@ -76,7 +65,7 @@ class NDCCFixedSoftLoss(NDCCLoss):
                 self.w_nll * md_reg[~norm_mask].mean()
         else:
             novel_l = 0
-        return norm_l + self.w_novel * novel_l
+        return (1 - self.w_novel) * norm_l + self.w_novel * novel_l
 
 
 def all_sq_md(embeds, means, sigma2s):
