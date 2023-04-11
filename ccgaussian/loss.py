@@ -36,7 +36,7 @@ class NDCCFixedLoss(NDCCLoss):
         if embeds.shape[0] == 0:
             return torch.scalar_tensor(0.)
         return self.ce_loss(logits, targets) + self.w_nll * \
-            torch.mean(NDCCLoss.sq_mahalanobis_d(embeds, means, sigma2s, targets)) / 2
+            torch.mean(NDCCLoss.sq_mahalanobis_d(embeds, means, sigma2s, targets))
 
 
 class NDCCFixedSoftLoss(NDCCLoss):
@@ -52,7 +52,7 @@ class NDCCFixedSoftLoss(NDCCLoss):
         assert torch.allclose(torch.sum(soft_targets, axis=1),
                               torch.ones(soft_targets.shape[0]).to(soft_targets.device))
         # take sum over clusters then later mean over batch dimension to get scalar
-        md_reg = torch.sum(all_sq_md(embeds, means, sigma2s) * soft_targets, dim=1) / 2
+        md_reg = torch.sum(all_sq_md(embeds, means, sigma2s) * soft_targets, dim=1)
         # normal loss, checking for empty inputs
         if norm_mask.sum() > 0:
             norm_l = self.ce_loss(logits[norm_mask], soft_targets[norm_mask]) + \
