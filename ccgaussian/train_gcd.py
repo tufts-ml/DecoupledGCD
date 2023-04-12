@@ -245,8 +245,10 @@ def train_gcd(args):
                 # to not be displayed in Tensorboard HPARAMS tab
                 metric_dict.update({
                     f"Metrics/{phase}_loss": av_writer.get_avg(f"{phase}/Average Loss"),
-                    f"Metrics/{phase}_accuracy": av_writer.get_avg(f"{phase}/Average Accuracy"),
-                    f"Metrics/{phase}_nll": av_writer.get_avg(f"{phase}/Average NLL"),
+                    f"Metrics/{phase}_labeled_accuracy": av_writer.get_avg(
+                        f"{phase}/Average {label_types[0]} Accuracy"),
+                    f"Metrics/{phase}_unlabeled_ce": av_writer.get_avg(
+                        f"{phase}/Average {label_types[1]} Cross-Entropy"),
                 })
             # output statistics
             av_writer.write(epoch)
