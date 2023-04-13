@@ -2,6 +2,10 @@ from pathlib import Path
 
 import torch
 
+from ccgaussian.test.bootstrap import bootstrap_metric
+from ccgaussian.test.plot import plot_con_matrix, plot_gcd_ci
+from ccgaussian.test.stats import cluster_acc, cluster_confusion
+
 
 def cache_test_outputs(model, normal_classes, test_loader, out_dir):
     out_dir = Path(out_dir)
@@ -35,3 +39,17 @@ def cache_test_outputs(model, normal_classes, test_loader, out_dir):
     torch.save(out_norm_mask.cpu(), out_dir / "norm_mask.pt")
     torch.save(out_means.cpu(), out_dir / "means.pt")
     torch.save(out_sigma2s.cpu(), out_dir / "sigma2s.pt")
+
+
+def eval_from_cache(out_dir):
+    out_dir = Path(out_dir)
+    y_pred = torch.max(torch.load(out_dir / "logits.pt"), dim=1)[1]
+    y_true = torch.load(out_dir / "targets.pt")
+    norm_mask = torch.load(out_dir / "norm_mask.pt")
+    # get accuracies
+    plot_gcd_ci(
+        bootstrap_metric(y_pred, y_true, cluster_acc),
+        bootstrap_metric(y_pred[norm_mask], y_true[norm_mask], cluster_acc),
+        bootstrap_metric(y_pred[~norm_mask], y_true[~norm_mask], cluster_acc)
+    ).savefig(out_dir / "acc_ci.png")
+    plot_con_matrix(cluster_confusion(y_pred, y_true)).savefig(out_dir / "conf_mat.png")

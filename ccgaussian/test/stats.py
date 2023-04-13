@@ -2,16 +2,19 @@ import numpy as np
 import scipy.optimize as optimize
 
 
-def classification_acc(y_pred, y_true):
-    assert y_pred.size == y_true.size
-    num_correct = (y_pred == y_true).astype(np.int64).sum()
-    return float(num_correct) / len(y_pred)
+def cluster_acc(y_pred, y_true):
+    return _cluster_acc(*_assign_clusters(y_pred, y_true))
+
+
+def cluster_confusion(y_pred, y_true):
+    return _cluster_confusion(*_assign_clusters(y_pred, y_true))
+
 
 # cluster functions based on:
 # https://github.com/k-han/AutoNovel/blob/5eda7e45898cf3fbcde4c34b9c14c743082abd94/utils/util.py#L19\
 
 
-def assign_clusters(y_pred, y_true):
+def _assign_clusters(y_pred, y_true):
     """Calculate cluster assignments
 
     Args:
@@ -37,7 +40,7 @@ def assign_clusters(y_pred, y_true):
     return row_ind, col_ind, weight
 
 
-def cluster_acc(row_ind, col_ind, weight):
+def _cluster_acc(row_ind, col_ind, weight):
     """Compute clustering accuracy
 
     Args:
@@ -51,7 +54,7 @@ def cluster_acc(row_ind, col_ind, weight):
     return float(weight[row_ind, col_ind].sum()) / weight.sum()
 
 
-def cluster_confusion(row_ind, col_ind, weight):
+def _cluster_confusion(row_ind, col_ind, weight):
     """Reorder weight matrix to get clustering confusion matrix
 
     Args:

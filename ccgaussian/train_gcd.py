@@ -14,7 +14,7 @@ from ccgaussian.logger import AverageWriter
 from ccgaussian.loss import NDCCFixedSoftLoss, novelty_sq_md
 from ccgaussian.model import DinoCCG
 from ccgaussian.scheduler import warm_cos_scheduler
-from ccgaussian.test.eval import cache_test_outputs
+from ccgaussian.test.eval import cache_test_outputs, eval_from_cache
 
 
 def get_args():
@@ -269,8 +269,10 @@ def train_gcd(args):
         "w_nll": args.w_nll,
         "w_unlab": args.w_unlab,
     }, metric_dict)
-    torch.save(model.state_dict(), Path(av_writer.writer.get_logdir()) / f"{args.num_epochs}.pt")
-    cache_test_outputs(model, normal_classes, test_loader, Path(av_writer.writer.get_logdir()))
+    out_dir = Path(av_writer.writer.get_logdir())
+    torch.save(model.state_dict(), out_dir / f"{args.num_epochs}.pt")
+    cache_test_outputs(model, normal_classes, test_loader, out_dir)
+    eval_from_cache(out_dir)
 
 
 if __name__ == "__main__":
