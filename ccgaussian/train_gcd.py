@@ -251,6 +251,8 @@ def train_gcd(args):
                     f"Metrics/{phase}_loss": av_writer.get_avg(f"{phase}/Average Loss"),
                     f"Metrics/{phase}_labeled_accuracy": av_writer.get_avg(
                         f"{phase}/Average {label_types[0]} Accuracy"),
+                    f"Metrics/{phase}_unlabeled_pseudo_accuracy": av_writer.get_avg(
+                        f"{phase}/Average {label_types[1]} Pseudo-Accuracy"),
                     f"Metrics/{phase}_unlabeled_ce": av_writer.get_avg(
                         f"{phase}/Average {label_types[1]} Cross-Entropy"),
                 })
