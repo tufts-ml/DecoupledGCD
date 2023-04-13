@@ -200,23 +200,27 @@ def train_gcd(args):
                 # record non-class specific statistics
                 av_writer.update(f"{phase}/Average Loss",
                                  loss.item(), num_samples)
+                _, preds = torch.max(logits, 1)
                 # calculate statistics masking unlabeled or novel data
                 if label_mask.sum() > 0:
-                    _, preds = torch.max(logits[label_mask], 1)
                     av_writer.update(f"{phase}/Average {label_types[0]} Accuracy",
-                                     torch.mean((preds == targets[label_mask]).float()),
+                                     torch.mean((preds[label_mask] == targets[label_mask]).float()),
                                      label_mask.sum())
                     av_writer.update(f"{phase}/Average Min Sq MD {label_types[0]}",
                                      novelty_sq_md(embeds[label_mask], means, sigma2s).mean(),
                                      label_mask.sum())
                 # calculate statistics masking labeled or normal data
                 if (~label_mask).sum() > 0:
+                    pseudo_conf, pseudo_target = torch.max(soft_targets[~label_mask], dim=1)
+                    av_writer.update(f"{phase}/Average {label_types[1]} Pseudo-Accuracy",
+                                     torch.mean((preds[~label_mask] == pseudo_target).float()),
+                                     (~label_mask).sum())
                     av_writer.update(f"{phase}/Average {label_types[1]} Cross-Entropy",
                                      loss_func.ce_loss(logits[~label_mask],
                                                        soft_targets[~label_mask]),
                                      (~label_mask).sum())
                     av_writer.update(f"{phase}/Average {label_types[1]} Pseudo-label Confidence",
-                                     torch.max(soft_targets[~label_mask], dim=1)[0].mean(),
+                                     pseudo_conf.mean(),
                                      (~label_mask).sum())
                     av_writer.update(f"{phase}/Average Min Sq MD {label_types[1]}",
                                      novelty_sq_md(embeds[~label_mask], means, sigma2s).mean(),
