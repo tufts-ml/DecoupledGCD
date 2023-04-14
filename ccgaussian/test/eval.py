@@ -10,7 +10,8 @@ from ccgaussian.test.stats import cluster_acc, cluster_confusion
 def cache_test_outputs(model, normal_classes, test_loader, out_dir):
     out_dir = Path(out_dir)
     model.eval()
-    device = model.device
+    # choose device
+    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     # initialize caches
     out_logits = torch.empty((0, model.num_classes)).to(device)
     out_targets = torch.tensor([], dtype=int).to(device)
