@@ -44,9 +44,9 @@ def cache_test_outputs(model, normal_classes, test_loader, out_dir):
 
 def eval_from_cache(out_dir):
     out_dir = Path(out_dir)
-    y_pred = torch.max(torch.load(out_dir / "logits.pt"), dim=1)[1]
-    y_true = torch.load(out_dir / "targets.pt")
-    norm_mask = torch.load(out_dir / "norm_mask.pt")
+    y_pred = torch.max(torch.load(out_dir / "logits.pt"), dim=1)[1].numpy()
+    y_true = torch.load(out_dir / "targets.pt").numpy()
+    norm_mask = torch.load(out_dir / "norm_mask.pt").numpy()
     # get accuracies
     plot_gcd_ci(
         bootstrap_metric(y_pred, y_true, cluster_acc),

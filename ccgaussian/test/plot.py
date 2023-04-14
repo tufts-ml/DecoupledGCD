@@ -4,8 +4,7 @@ from sklearn import metrics
 
 
 def plot_con_matrix(con_matrix):
-    disp = metrics.ConfusionMatrixDisplay(
-        con_matrix, display_labels=["Novel", "Normal"])
+    disp = metrics.ConfusionMatrixDisplay(con_matrix)
     disp = disp.plot(cmap="Blues", values_format=".0f")
     return disp.figure_
 
