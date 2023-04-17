@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 import random
 
+import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
@@ -244,6 +245,9 @@ def train_gcd(args):
                     unlab_embeds.detach().cpu().numpy(),
                     unlab_resp.detach().cpu().numpy(),
                     float(model.sigma2s[0].detach().cpu()))
+                # record percentage of active clusters
+                av_writer.update(f"{phase}/Percentage Active Clusters",
+                                 np.mean(gmm.weights_ > 0))
             # record end of training stats, grouped as Metrics in Tensorboard
             if phase != "Train" and epoch == args.num_epochs - 1:
                 # note non-numeric values (NaN, None, ect.) will cause entry
