@@ -12,7 +12,7 @@ from gcd_data.get_datasets import get_class_splits, get_datasets
 
 from ccgaussian.augment import sim_gcd_train, sim_gcd_test
 from ccgaussian.logger import AverageWriter
-from ccgaussian.loss import NDCCFixedSoftLoss, novelty_sq_md
+from ccgaussian.loss import GMMFixedLoss
 from ccgaussian.model import DinoCCG
 from ccgaussian.scheduler import warm_cos_scheduler
 from ccgaussian.test.eval import cache_test_outputs, eval_from_cache
@@ -138,7 +138,7 @@ def train_gcd(args):
     scheduler = warm_cos_scheduler(optim, args.num_epochs, train_loader)
     phases = ["Train", "Valid", "Test"]
     # init loss
-    loss_func = NDCCFixedSoftLoss(args.w_nll, args.w_unlab)
+    loss_func = GMMFixedLoss(args.w_nll, args.w_unlab)
     # init tensorboard, with random comment to stop overlapping runs
     av_writer = AverageWriter(args.label, comment=str(random.randint(0, 9999)))
     # metric dict for recording hparam metrics
@@ -167,6 +167,7 @@ def train_gcd(args):
                 unlab_resp = torch.empty((0, num_classes)).to(device)
                 label_embeds = torch.empty((0, model.embed_len)).to(device)
                 label_targets = torch.tensor([], dtype=int).to(device)
+            gmm_means = torch.Tensor(gmm.means_)
             for batch in dataloader:
                 # use label mask to separate labeled and unlabeled for train batches
                 if phase == "Train":
@@ -193,7 +194,7 @@ def train_gcd(args):
                     # create soft targets for unlabeled data
                     soft_targets[~label_mask] = torch.Tensor(
                         gmm.deep_e_step(embeds[~label_mask].detach().cpu().numpy())).to(device)
-                    loss = loss_func(logits, embeds, means, sigma2s, torch.Tensor(gmm.means_),
+                    loss = loss_func(logits, embeds, means, sigma2s, gmm_means,
                                      soft_targets, label_mask)
                 # backward and optimize only if in training phase
                 if phase == "Train":
@@ -204,13 +205,18 @@ def train_gcd(args):
                 av_writer.update(f"{phase}/Average Loss",
                                  loss.item(), num_samples)
                 _, preds = torch.max(logits, 1)
+                # calculate non-masked statistics
+                av_writer.update(f"{phase}/Average Means Sq MD {label_types[0]}",
+                                 loss_func.means_md_loss(means, sigma2s, gmm_means, soft_targets),
+                                 soft_targets.shape[0])
                 # calculate statistics masking unlabeled or novel data
                 if label_mask.sum() > 0:
                     av_writer.update(f"{phase}/Average {label_types[0]} Accuracy",
                                      torch.mean((preds[label_mask] == targets[label_mask]).float()),
                                      label_mask.sum())
-                    av_writer.update(f"{phase}/Average Min Sq MD {label_types[0]}",
-                                     novelty_sq_md(embeds[label_mask], means, sigma2s).mean(),
+                    av_writer.update(f"{phase}/Average Embedding Sq MD {label_types[0]}",
+                                     loss_func.embed_md_loss(embeds[label_mask], sigma2s, gmm_means,
+                                                             soft_targets[label_mask]),
                                      label_mask.sum())
                 # calculate statistics masking labeled or normal data
                 if (~label_mask).sum() > 0:
@@ -225,8 +231,9 @@ def train_gcd(args):
                     av_writer.update(f"{phase}/Average {label_types[1]} Pseudo-label Confidence",
                                      pseudo_conf.mean(),
                                      (~label_mask).sum())
-                    av_writer.update(f"{phase}/Average Min Sq MD {label_types[1]}",
-                                     novelty_sq_md(embeds[~label_mask], means, sigma2s).mean(),
+                    av_writer.update(f"{phase}/Average Embedding Sq MD {label_types[1]}",
+                                     loss_func.embed_md_loss(embeds[~label_mask], sigma2s,
+                                                             gmm_means, soft_targets[~label_mask]),
                                      (~label_mask).sum())
                 # only output annealed values for training since other phases will match it
                 if phase == "Train":

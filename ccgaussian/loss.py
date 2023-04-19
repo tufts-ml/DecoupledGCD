@@ -39,17 +39,23 @@ class NDCCFixedLoss(NDCCLoss):
             torch.mean(NDCCLoss.sq_mahalanobis_d(embeds, means, sigma2s, targets))
 
 
-class NDCCFixedSoftLoss(NDCCLoss):
+class GMMFixedLoss(NDCCLoss):
     def __init__(self, w_nll, w_unlab) -> None:
         super().__init__(w_nll)
         self.w_unlab = w_unlab
 
-    def md_loss(self, embeds, means, sigma2s, gmm_means, soft_targets):
-        embed_md = NDCCLoss.sq_mahalanobis_d(
+    def embed_md_loss(self, embeds, sigma2s, gmm_means, soft_targets):
+        return NDCCLoss.sq_mahalanobis_d(
             embeds, gmm_means, sigma2s, soft_targets.argmax(dim=1)).mean()
-        cls_md = NDCCLoss.sq_mahalanobis_d(
+
+    def means_md_loss(self, means, sigma2s, gmm_means, soft_targets):
+        return NDCCLoss.sq_mahalanobis_d(
             means, gmm_means, sigma2s, soft_targets.argmax(dim=1)).mean()
-        return embed_md + cls_md
+
+    def md_loss(self, embeds, means, sigma2s, gmm_means, soft_targets):
+        embed_md = self.embed_md_loss(embeds, sigma2s, gmm_means, soft_targets)
+        means_md = self.means_md_loss(means, sigma2s, gmm_means, soft_targets)
+        return embed_md + means_md
 
     # NDCCLoss for soft labels and fixed variance
     def forward(self, logits, embeds, means, sigma2s, gmm_means, soft_targets, label_mask):
