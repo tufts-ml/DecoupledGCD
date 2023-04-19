@@ -193,7 +193,8 @@ def train_gcd(args):
                     # create soft targets for unlabeled data
                     soft_targets[~label_mask] = torch.Tensor(
                         gmm.deep_e_step(embeds[~label_mask].detach().cpu().numpy())).to(device)
-                    loss = loss_func(logits, embeds, means, sigma2s, soft_targets, label_mask)
+                    loss = loss_func(logits, embeds, means, sigma2s, torch.Tensor(gmm.means_),
+                                     soft_targets, label_mask)
                 # backward and optimize only if in training phase
                 if phase == "Train":
                     loss.backward()
