@@ -167,7 +167,7 @@ def train_gcd(args):
                 unlab_resp = torch.empty((0, num_classes)).to(device)
                 label_embeds = torch.empty((0, model.embed_len)).to(device)
                 label_targets = torch.tensor([], dtype=int).to(device)
-            gmm_means = torch.Tensor(gmm.means_)
+            gmm_means = torch.Tensor(gmm.means_).to(device)
             for batch in dataloader:
                 # use label mask to separate labeled and unlabeled for train batches
                 if phase == "Train":
