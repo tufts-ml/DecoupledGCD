@@ -49,8 +49,8 @@ class GMMFixedLoss(NDCCLoss):
             embeds, gmm_means, sigma2s, soft_targets.argmax(dim=1)).mean()
 
     def means_md_loss(self, means, sigma2s, gmm_means, soft_targets):
-        return NDCCLoss.sq_mahalanobis_d(
-            means, gmm_means, sigma2s, soft_targets.argmax(dim=1)).mean()
+        p_targets = soft_targets.argmax(dim=1)
+        return NDCCLoss.sq_mahalanobis_d(means[p_targets], gmm_means, sigma2s, p_targets).mean()
 
     def md_loss(self, embeds, means, sigma2s, gmm_means, soft_targets):
         embed_md = self.embed_md_loss(embeds, sigma2s, gmm_means, soft_targets)
