@@ -40,9 +40,10 @@ class NDCCFixedLoss(NDCCLoss):
 
 
 class GMMFixedLoss(NDCCLoss):
-    def __init__(self, w_nll, w_unlab) -> None:
+    def __init__(self, w_nll, w_unlab, pseudo_thresh) -> None:
         super().__init__(w_nll)
         self.w_unlab = w_unlab
+        self.pseudo_thresh = pseudo_thresh
 
     def embed_md_loss(self, embeds, sigma2s, gmm_means, soft_targets):
         return NDCCLoss.sq_mahalanobis_d(
@@ -71,11 +72,13 @@ class GMMFixedLoss(NDCCLoss):
                                           soft_targets[label_mask])
         else:
             norm_l = 0
+        # create mask for unlabeled data accounting for pseudo-label thresholding
+        unlabel_mask = torch.logical_and(~label_mask, soft_targets.max(axis=1) > self.pseudo_thresh)
         # novel loss, checking for empty inputs
-        if (~label_mask).sum() > 0:
-            novel_l = self.ce_loss(logits[~label_mask], soft_targets[~label_mask]) + \
-                self.w_nll * self.md_loss(embeds[~label_mask], means, sigma2s, gmm_means,
-                                          soft_targets[~label_mask])
+        if unlabel_mask.sum() > 0:
+            novel_l = self.ce_loss(logits[unlabel_mask], soft_targets[unlabel_mask]) + \
+                self.w_nll * self.md_loss(embeds[unlabel_mask], means, sigma2s, gmm_means,
+                                          soft_targets[unlabel_mask])
         else:
             novel_l = 0
         return (1 - self.w_unlab) * norm_l + self.w_unlab * novel_l

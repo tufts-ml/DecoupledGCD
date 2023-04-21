@@ -43,6 +43,8 @@ def get_args():
     parser.add_argument("--end_var", type=float, default=3e-1,
                         help="Final variance")
     parser.add_argument("--var_warmup", type=int, default=25)
+    parser.add_argument("--pseudo_thresh", type=float, default=.95,
+                        help="Threshold for pseduo-label acceptance")
     # loss hyperparameters
     parser.add_argument("--w_nll", type=float, default=.025,
                         help="Negative log-likelihood weight for embedding network")
@@ -138,7 +140,7 @@ def train_gcd(args):
     scheduler = warm_cos_scheduler(optim, args.num_epochs, train_loader)
     phases = ["Train", "Valid", "Test"]
     # init loss
-    loss_func = GMMFixedLoss(args.w_nll, args.w_unlab)
+    loss_func = GMMFixedLoss(args.w_nll, args.w_unlab, args.pseudo_thresh)
     # init tensorboard, with random comment to stop overlapping runs
     av_writer = AverageWriter(args.label, comment=str(random.randint(0, 9999)))
     # metric dict for recording hparam metrics
