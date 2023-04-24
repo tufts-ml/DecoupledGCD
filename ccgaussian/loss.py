@@ -54,9 +54,11 @@ class GMMFixedLoss(NDCCLoss):
         return NDCCLoss.sq_mahalanobis_d(means[p_targets], gmm_means, sigma2s, p_targets).mean()
 
     def md_loss(self, embeds, means, sigma2s, gmm_means, soft_targets):
-        embed_md = self.embed_md_loss(embeds, sigma2s, gmm_means, soft_targets)
-        means_md = self.means_md_loss(means, sigma2s, gmm_means, soft_targets)
-        return embed_md + means_md
+        # TODO figure out if this old loss formulation should be used
+        return self.embed_md_loss(embeds, sigma2s, means, soft_targets)
+        # embed_md = self.embed_md_loss(embeds, sigma2s, gmm_means, soft_targets)
+        # means_md = self.means_md_loss(means, sigma2s, gmm_means, soft_targets)
+        # return embed_md + means_md
 
     # NDCCLoss for soft labels and fixed variance
     def forward(self, logits, embeds, means, sigma2s, gmm_means, soft_targets, label_mask):
