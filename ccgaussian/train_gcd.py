@@ -234,7 +234,8 @@ def train_gcd(args):
                                      pseudo_conf.mean(),
                                      (~label_mask).sum())
                     av_writer.update(f"{phase}/{label_types[1]} Pseudo-label Accept Percentage",
-                                     (pseudo_conf >= args.pseudo_thresh).mean(),
+                                     ((pseudo_conf >= args.pseudo_thresh).sum() /
+                                      (~label_mask).sum()),
                                      (~label_mask).sum())
                     av_writer.update(f"{phase}/Average Embedding Sq MD {label_types[1]}",
                                      loss_func.embed_md_loss(embeds[~label_mask], sigma2s,
