@@ -250,8 +250,19 @@ def train_gcd(args):
                     unlab_resp = torch.vstack((unlab_resp, soft_targets[~label_mask]))
                     label_embeds = torch.vstack((label_embeds, embeds[label_mask]))
                     label_targets = torch.hstack((label_targets, targets[label_mask]))
-            # update SSGMM using classifier predictions for unlabeled data
+            # operations on m step cache
             if phase == "Train":
+                # statistics for variance of embeddings and means
+                av_writer.update(f"{phase}/Average {label_types[0]} Embedding Variance",
+                                 torch.mean(torch.var(label_embeds)),
+                                 label_embeds.shape[0])
+                av_writer.update(f"{phase}/Average {label_types[1]} Embedding Variance",
+                                 torch.mean(torch.var(unlab_embeds)),
+                                 unlab_embeds.shape[0])
+                av_writer.update(f"{phase}/GMM Mean Average Variance",
+                                 torch.mean(torch.var(gmm_means)),
+                                 num_classes)
+                # update SSGMM using classifier predictions for unlabeled data
                 gmm.deep_m_step(
                     label_embeds.detach().cpu().numpy(),
                     label_targets.detach().cpu().numpy(),

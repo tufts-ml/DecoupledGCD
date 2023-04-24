@@ -32,14 +32,14 @@ class TestNDCCLoss():
 
 
 def test_empty_soft():
-    loss = ccgaussian.loss.GMMFixedLoss(w_nll=.025, w_unlab=0)
+    loss = ccgaussian.loss.GMMFixedLoss(w_nll=.025, w_unlab=0, pseudo_thresh=0)
     logits, embeds, means, sigma2s, targets, norm_mask = dummy_data(0)
     assert loss(logits, embeds, means, sigma2s, means, targets, norm_mask) == 0
 
 
 def test_soft_consistent():
     loss = ccgaussian.loss.NDCCFixedLoss(w_nll=.025)
-    soft_loss = ccgaussian.loss.GMMFixedLoss(w_nll=.025, w_unlab=0)
+    soft_loss = ccgaussian.loss.GMMFixedLoss(w_nll=.025, w_unlab=0, pseudo_thresh=0)
     num_samples = 8
     logits, embeds, means, sigma2s, targets, norm_mask = dummy_data(num_samples)
     soft_targets = torch.zeros((num_samples, num_classes))
