@@ -73,7 +73,8 @@ class GMMFixedLoss(NDCCLoss):
         else:
             norm_l = 0
         # create mask for unlabeled data accounting for pseudo-label thresholding
-        unlabel_mask = torch.logical_and(~label_mask, soft_targets.max(axis=1) > self.pseudo_thresh)
+        unlabel_mask = torch.logical_and(
+            ~label_mask, soft_targets.max(axis=1)[0] >= self.pseudo_thresh)
         # novel loss, checking for empty inputs
         if unlabel_mask.sum() > 0:
             novel_l = self.ce_loss(logits[unlabel_mask], soft_targets[unlabel_mask]) + \
