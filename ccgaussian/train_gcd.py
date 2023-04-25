@@ -208,7 +208,7 @@ def train_gcd(args):
                                  loss.item(), num_samples)
                 _, preds = torch.max(logits, 1)
                 # calculate non-masked statistics
-                av_writer.update(f"{phase}/Average Means Sq MD {label_types[0]}",
+                av_writer.update(f"{phase}/Average Means Sq MD",
                                  loss_func.means_md_loss(means, sigma2s, gmm_means, soft_targets),
                                  soft_targets.shape[0])
                 # calculate statistics masking unlabeled or novel data
