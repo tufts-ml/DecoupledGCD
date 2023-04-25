@@ -55,8 +55,10 @@ class GMMFixedLoss(NDCCLoss):
 
     def md_loss(self, embeds, means, sigma2s, gmm_means, soft_targets):
         # TODO figure out if this old loss formulation should be used
-        return self.embed_md_loss(embeds, sigma2s, means, soft_targets)
-        # embed_md = self.embed_md_loss(embeds, sigma2s, gmm_means, soft_targets)
+        # return self.embed_md_loss(embeds, sigma2s, means, soft_targets)
+        # TODO or if just one of these terms should be used
+        embed_md = self.embed_md_loss(embeds, sigma2s, gmm_means, soft_targets)
+        return embed_md
         # means_md = self.means_md_loss(means, sigma2s, gmm_means, soft_targets)
         # return embed_md + means_md
 
