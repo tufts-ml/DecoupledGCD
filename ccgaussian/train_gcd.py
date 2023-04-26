@@ -264,12 +264,15 @@ def train_gcd(args):
                                  torch.mean(torch.var(gmm_means)),
                                  num_classes)
                 # update SSGMM using classifier predictions for unlabeled data
+                # TODO testing freezing all means
+                frozen_gmm_means = gmm.means_
                 gmm.deep_m_step(
                     label_embeds.detach().cpu().numpy(),
                     label_targets.detach().cpu().numpy(),
                     unlab_embeds.detach().cpu().numpy(),
                     unlab_resp.detach().cpu().numpy(),
                     float(model.sigma2s[0].detach().cpu()))
+                gmm.means_ = frozen_gmm_means
                 # record percentage of active clusters
                 av_writer.update(f"{phase}/Percentage Active Clusters",
                                  np.mean(gmm.weights_ > 0))
