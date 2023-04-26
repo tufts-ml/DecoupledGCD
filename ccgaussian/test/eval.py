@@ -14,6 +14,7 @@ def cache_test_outputs(model, normal_classes, test_loader, out_dir):
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     # initialize caches
     out_logits = torch.empty((0, model.num_classes)).to(device)
+    out_embeds = torch.empty((0, model.embed_len)).to(device)
     out_targets = torch.tensor([], dtype=int).to(device)
     out_norm_mask = torch.tensor([], dtype=bool).to(device)
     out_means = None
@@ -29,6 +30,7 @@ def cache_test_outputs(model, normal_classes, test_loader, out_dir):
             logits, embeds, means, sigma2s = model(data)
         # cache data
         out_logits = torch.vstack((out_logits, logits))
+        out_embeds = torch.vstack((out_embeds, embeds))
         out_targets = torch.hstack((out_targets, targets))
         out_norm_mask = torch.hstack((out_norm_mask, norm_mask))
         if out_means is None or out_sigma2s is None:
@@ -36,6 +38,7 @@ def cache_test_outputs(model, normal_classes, test_loader, out_dir):
             out_sigma2s = sigma2s.cpu()
     # write caches
     torch.save(out_logits.cpu(), out_dir / "logits.pt")
+    torch.save(out_embeds.cpu(), out_dir / "embeds.pt")
     torch.save(out_targets.cpu(), out_dir / "targets.pt")
     torch.save(out_norm_mask.cpu(), out_dir / "norm_mask.pt")
     torch.save(out_means.cpu(), out_dir / "means.pt")
