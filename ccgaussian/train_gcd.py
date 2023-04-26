@@ -217,7 +217,7 @@ def train_gcd(args):
                                      torch.mean((preds[label_mask] == targets[label_mask]).float()),
                                      label_mask.sum())
                     av_writer.update(f"{phase}/Average Embedding Sq MD {label_types[0]}",
-                                     loss_func.embed_md_loss(embeds[label_mask], sigma2s, gmm_means,
+                                     loss_func.embed_md_loss(embeds[label_mask], sigma2s, means,
                                                              soft_targets[label_mask]),
                                      label_mask.sum())
                 # calculate statistics masking labeled or normal data
@@ -239,7 +239,7 @@ def train_gcd(args):
                                      (~label_mask).sum())
                     av_writer.update(f"{phase}/Average Embedding Sq MD {label_types[1]}",
                                      loss_func.embed_md_loss(embeds[~label_mask], sigma2s,
-                                                             gmm_means, soft_targets[~label_mask]),
+                                                             means, soft_targets[~label_mask]),
                                      (~label_mask).sum())
                 # only output annealed values for training since other phases will match it
                 if phase == "Train":
@@ -264,7 +264,7 @@ def train_gcd(args):
                                  torch.mean(torch.var(gmm_means)),
                                  num_classes)
                 # update SSGMM using classifier predictions for unlabeled data
-                # TODO testing freezing all means
+                # TODO testing freezing only novel means
                 frozen_gmm_means = gmm.means_
                 gmm.deep_m_step(
                     label_embeds.detach().cpu().numpy(),
@@ -272,7 +272,7 @@ def train_gcd(args):
                     unlab_embeds.detach().cpu().numpy(),
                     unlab_resp.detach().cpu().numpy(),
                     float(model.sigma2s[0].detach().cpu()))
-                gmm.means_ = frozen_gmm_means
+                gmm.means_[:len(normal_classes)] = frozen_gmm_means[:len(normal_classes)]
                 # record percentage of active clusters
                 av_writer.update(f"{phase}/Percentage Active Clusters",
                                  np.mean(gmm.weights_ > 0))
