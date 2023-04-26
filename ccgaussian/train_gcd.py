@@ -272,7 +272,7 @@ def train_gcd(args):
                     unlab_embeds.detach().cpu().numpy(),
                     unlab_resp.detach().cpu().numpy(),
                     float(model.sigma2s[0].detach().cpu()))
-                gmm.means_[:len(normal_classes)] = frozen_gmm_means[:len(normal_classes)]
+                gmm.means_[len(normal_classes):] = frozen_gmm_means[len(normal_classes):]
                 # record percentage of active clusters
                 av_writer.update(f"{phase}/Percentage Active Clusters",
                                  np.mean(gmm.weights_ > 0))
