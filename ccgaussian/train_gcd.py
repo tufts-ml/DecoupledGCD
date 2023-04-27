@@ -277,7 +277,9 @@ def train_gcd(args):
             # operations on m step cache
             if phase == "Train":
                 # output cache stats
-                update_cache_stats()
+                update_cache_stats(av_writer, phase, label_types, loss_func, gmm, device,
+                                   label_embeds, unlab_embeds, preds_cache, num_classes, means,
+                                   sigma2s)
                 # update SSGMM using classifier predictions for unlabeled data
                 gmm.deep_m_step(
                     label_embeds.detach().cpu().numpy(),
