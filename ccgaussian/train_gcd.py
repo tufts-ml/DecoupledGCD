@@ -2,7 +2,6 @@ import argparse
 from pathlib import Path
 import random
 
-import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
@@ -115,6 +114,59 @@ def init_gmm(model: DinoCCG, train_loader, device):
                      model.init_var)
 
 
+def update_batch_stats(av_writer, phase, label_mask, label_types, loss_func, logits, embeds, means,
+                       sigma2s, targets, soft_targets, preds):
+    # calculate statistics masking unlabeled or novel data
+    if label_mask.sum() > 0:
+        av_writer.update(f"{phase}/Average {label_types[0]} Accuracy",
+                         torch.mean((preds[label_mask] == targets[label_mask]).float()),
+                         label_mask.sum())
+        av_writer.update(f"{phase}/Average Embedding Sq MD {label_types[0]}",
+                         loss_func.md_loss(embeds[label_mask], means, sigma2s,
+                                           soft_targets[label_mask]),
+                         label_mask.sum())
+    # calculate statistics masking labeled or normal data
+    if (~label_mask).sum() > 0:
+        pseudo_conf, pseudo_target = torch.max(soft_targets[~label_mask], dim=1)
+        av_writer.update(f"{phase}/Average {label_types[1]} Pseudo-Accuracy",
+                         torch.mean((preds[~label_mask] == pseudo_target).float()),
+                         (~label_mask).sum())
+        av_writer.update(f"{phase}/Average {label_types[1]} Cross-Entropy",
+                         loss_func.ce_loss(logits[~label_mask],
+                                           soft_targets[~label_mask]),
+                         (~label_mask).sum())
+        av_writer.update(f"{phase}/Average {label_types[1]} Pseudo-label Confidence",
+                         pseudo_conf.mean(),
+                         (~label_mask).sum())
+        av_writer.update(f"{phase}/{label_types[1]} Pseudo-label Accept Percentage",
+                         ((pseudo_conf >= args.pseudo_thresh).sum() /
+                             (~label_mask).sum()),
+                         (~label_mask).sum())
+        av_writer.update(f"{phase}/Average Embedding Sq MD {label_types[1]}",
+                         loss_func.md_loss(embeds[~label_mask], means, sigma2s,
+                                           soft_targets[~label_mask]),
+                         (~label_mask).sum())
+
+
+def update_cache_stats(av_writer, phase, label_types, loss_func, gmm, device, label_embeds,
+                       unlab_embeds, preds_cache, num_classes, means, sigma2s):
+    # statistics for variance of embeddings and means
+    # don't need third update parameter since only updated once before output
+    gmm_means = torch.Tensor(gmm.means_).to(device)
+    av_writer.update(f"{phase}/Average {label_types[0]} Embedding Variance",
+                     torch.mean(torch.var(label_embeds)))
+    av_writer.update(f"{phase}/Average {label_types[1]} Embedding Variance",
+                     torch.mean(torch.var(unlab_embeds)))
+    av_writer.update(f"{phase}/GMM Mean Average Variance",
+                     torch.mean(torch.var(gmm_means)))
+    av_writer.update(f"{phase}/Average Means Sq MD",
+                     loss_func.md_loss(means, gmm_means, sigma2s,
+                                       torch.arange(num_classes)))
+    # record percentage of active clusters
+    av_writer.update(f"{phase}/Percentage Active Clusters",
+                     len(torch.unique(preds_cache)) / num_classes)
+
+
 def train_gcd(args):
     # choose device
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
@@ -215,57 +267,17 @@ def train_gcd(args):
                     label_embeds = torch.vstack((label_embeds, embeds[label_mask]))
                     label_targets = torch.hstack((label_targets, targets[label_mask]))
                     preds_cache = torch.hstack((preds_cache, preds))
-                # calculate statistics masking unlabeled or novel data
-                if label_mask.sum() > 0:
-                    av_writer.update(f"{phase}/Average {label_types[0]} Accuracy",
-                                     torch.mean((preds[label_mask] == targets[label_mask]).float()),
-                                     label_mask.sum())
-                    av_writer.update(f"{phase}/Average Embedding Sq MD {label_types[0]}",
-                                     loss_func.md_loss(embeds[label_mask], means, sigma2s,
-                                                       soft_targets[label_mask]),
-                                     label_mask.sum())
-                # calculate statistics masking labeled or normal data
-                if (~label_mask).sum() > 0:
-                    pseudo_conf, pseudo_target = torch.max(soft_targets[~label_mask], dim=1)
-                    av_writer.update(f"{phase}/Average {label_types[1]} Pseudo-Accuracy",
-                                     torch.mean((preds[~label_mask] == pseudo_target).float()),
-                                     (~label_mask).sum())
-                    av_writer.update(f"{phase}/Average {label_types[1]} Cross-Entropy",
-                                     loss_func.ce_loss(logits[~label_mask],
-                                                       soft_targets[~label_mask]),
-                                     (~label_mask).sum())
-                    av_writer.update(f"{phase}/Average {label_types[1]} Pseudo-label Confidence",
-                                     pseudo_conf.mean(),
-                                     (~label_mask).sum())
-                    av_writer.update(f"{phase}/{label_types[1]} Pseudo-label Accept Percentage",
-                                     ((pseudo_conf >= args.pseudo_thresh).sum() /
-                                      (~label_mask).sum()),
-                                     (~label_mask).sum())
-                    av_writer.update(f"{phase}/Average Embedding Sq MD {label_types[1]}",
-                                     loss_func.md_loss(embeds[~label_mask], means, sigma2s,
-                                                       soft_targets[~label_mask]),
-                                     (~label_mask).sum())
+                # output batch stats
+                update_batch_stats(av_writer, phase, label_mask, label_types, loss_func, logits,
+                                   embeds, means, sigma2s, targets, soft_targets, preds)
                 # only output annealed values for training since other phases will match it
                 if phase == "Train":
                     av_writer.update(f"{phase}/Average Variance Mean",
                                      torch.mean(sigma2s), num_samples)
             # operations on m step cache
             if phase == "Train":
-                # statistics for variance of embeddings and means
-                gmm_means = torch.Tensor(gmm.means_).to(device)
-                av_writer.update(f"{phase}/Average {label_types[0]} Embedding Variance",
-                                 torch.mean(torch.var(label_embeds)),
-                                 label_embeds.shape[0])
-                av_writer.update(f"{phase}/Average {label_types[1]} Embedding Variance",
-                                 torch.mean(torch.var(unlab_embeds)),
-                                 unlab_embeds.shape[0])
-                av_writer.update(f"{phase}/GMM Mean Average Variance",
-                                 torch.mean(torch.var(gmm_means)),
-                                 num_classes)
-                av_writer.update(f"{phase}/Average Means Sq MD",
-                                 loss_func.md_loss(means, gmm_means, sigma2s,
-                                                   torch.arange(num_classes)),
-                                 soft_targets.shape[0])
+                # output cache stats
+                update_cache_stats()
                 # update SSGMM using classifier predictions for unlabeled data
                 gmm.deep_m_step(
                     label_embeds.detach().cpu().numpy(),
@@ -273,9 +285,6 @@ def train_gcd(args):
                     unlab_embeds.detach().cpu().numpy(),
                     unlab_resp.detach().cpu().numpy(),
                     float(model.sigma2s[0].detach().cpu()))
-                # record percentage of active clusters
-                av_writer.update(f"{phase}/Percentage Active Clusters",
-                                 np.mean(gmm.weights_ > 0))
             # record end of training stats, grouped as Metrics in Tensorboard
             if phase != "Train" and epoch == args.num_epochs - 1:
                 # note non-numeric values (NaN, None, ect.) will cause entry
