@@ -45,25 +45,12 @@ class GMMFixedLoss(NDCCLoss):
         self.w_unlab = w_unlab
         self.pseudo_thresh = pseudo_thresh
 
-    def embed_md_loss(self, embeds, sigma2s, gmm_means, soft_targets):
+    def md_loss(self, embeds, means, sigma2s, soft_targets):
         return NDCCLoss.sq_mahalanobis_d(
-            embeds, gmm_means, sigma2s, soft_targets.argmax(dim=1)).mean()
-
-    def means_md_loss(self, means, sigma2s, gmm_means, soft_targets):
-        p_targets = soft_targets.argmax(dim=1)
-        return NDCCLoss.sq_mahalanobis_d(means[p_targets], gmm_means, sigma2s, p_targets).mean()
-
-    def md_loss(self, embeds, means, sigma2s, gmm_means, soft_targets):
-        # TODO figure out if this old loss formulation should be used
-        return self.embed_md_loss(embeds, sigma2s, means, soft_targets)
-        # TODO or if just one of these terms should be used
-        # embed_md = self.embed_md_loss(embeds, sigma2s, gmm_means, soft_targets)
-        # return embed_md
-        # means_md = self.means_md_loss(means, sigma2s, gmm_means, soft_targets)
-        # return embed_md + means_md
+            embeds, means, sigma2s, soft_targets.argmax(dim=1)).mean()
 
     # NDCCLoss for soft labels and fixed variance
-    def forward(self, logits, embeds, means, sigma2s, gmm_means, soft_targets, label_mask):
+    def forward(self, logits, embeds, means, sigma2s, soft_targets, label_mask):
         if embeds.shape[0] == 0:
             return torch.scalar_tensor(0.)
         # validate soft_targets
@@ -72,7 +59,7 @@ class GMMFixedLoss(NDCCLoss):
         # normal loss, checking for empty inputs
         if label_mask.sum() > 0:
             norm_l = self.ce_loss(logits[label_mask], soft_targets[label_mask]) + \
-                self.w_nll * self.md_loss(embeds[label_mask], means, sigma2s, gmm_means,
+                self.w_nll * self.md_loss(embeds[label_mask], means, sigma2s,
                                           soft_targets[label_mask])
         else:
             norm_l = 0
@@ -81,10 +68,8 @@ class GMMFixedLoss(NDCCLoss):
             ~label_mask, soft_targets.max(axis=1)[0] >= self.pseudo_thresh)
         # novel loss, checking for empty inputs
         if unlabel_mask.sum() > 0:
-            # TODO testing no MD loss on unlabeled
-            novel_l = self.ce_loss(logits[unlabel_mask], soft_targets[unlabel_mask])  # + \
-            #    self.w_nll * self.md_loss(embeds[unlabel_mask], means, sigma2s, gmm_means,
-            #                              soft_targets[unlabel_mask])
+            # no MD loss on unlabeled
+            novel_l = self.ce_loss(logits[unlabel_mask], soft_targets[unlabel_mask])
         else:
             novel_l = 0
         return (1 - self.w_unlab) * norm_l + self.w_unlab * novel_l

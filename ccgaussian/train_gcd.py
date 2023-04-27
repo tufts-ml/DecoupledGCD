@@ -169,7 +169,8 @@ def train_gcd(args):
                 unlab_resp = torch.empty((0, num_classes)).to(device)
                 label_embeds = torch.empty((0, model.embed_len)).to(device)
                 label_targets = torch.tensor([], dtype=int).to(device)
-            gmm_means = torch.Tensor(gmm.means_).to(device)
+                # not needed for m step, but tracks how many clusters being used by classifier
+                preds_cache = torch.tensor([], dtype=int).to(device)
             for batch in dataloader:
                 # use label mask to separate labeled and unlabeled for train batches
                 if phase == "Train":
@@ -196,8 +197,7 @@ def train_gcd(args):
                     # create soft targets for unlabeled data
                     soft_targets[~label_mask] = torch.Tensor(
                         gmm.deep_e_step(embeds[~label_mask].detach().cpu().numpy())).to(device)
-                    loss = loss_func(logits, embeds, means, sigma2s, gmm_means,
-                                     soft_targets, label_mask)
+                    loss = loss_func(logits, embeds, means, sigma2s, soft_targets, label_mask)
                 # backward and optimize only if in training phase
                 if phase == "Train":
                     loss.backward()
@@ -207,18 +207,22 @@ def train_gcd(args):
                 av_writer.update(f"{phase}/Average Loss",
                                  loss.item(), num_samples)
                 _, preds = torch.max(logits, 1)
-                # calculate non-masked statistics
-                av_writer.update(f"{phase}/Average Means Sq MD",
-                                 loss_func.means_md_loss(means, sigma2s, gmm_means, soft_targets),
-                                 soft_targets.shape[0])
+                # cache data for m step
+                if phase == "Train":
+                    unlab_embeds = torch.vstack((unlab_embeds, embeds[~label_mask]))
+                    unlab_resp = torch.vstack((unlab_resp,
+                                               torch.nn.functional.softmax(logits[~label_mask])))
+                    label_embeds = torch.vstack((label_embeds, embeds[label_mask]))
+                    label_targets = torch.hstack((label_targets, targets[label_mask]))
+                    preds_cache = torch.hstack((preds_cache, preds))
                 # calculate statistics masking unlabeled or novel data
                 if label_mask.sum() > 0:
                     av_writer.update(f"{phase}/Average {label_types[0]} Accuracy",
                                      torch.mean((preds[label_mask] == targets[label_mask]).float()),
                                      label_mask.sum())
                     av_writer.update(f"{phase}/Average Embedding Sq MD {label_types[0]}",
-                                     loss_func.embed_md_loss(embeds[label_mask], sigma2s, means,
-                                                             soft_targets[label_mask]),
+                                     loss_func.md_loss(embeds[label_mask], means, sigma2s,
+                                                       soft_targets[label_mask]),
                                      label_mask.sum())
                 # calculate statistics masking labeled or normal data
                 if (~label_mask).sum() > 0:
@@ -238,22 +242,17 @@ def train_gcd(args):
                                       (~label_mask).sum()),
                                      (~label_mask).sum())
                     av_writer.update(f"{phase}/Average Embedding Sq MD {label_types[1]}",
-                                     loss_func.embed_md_loss(embeds[~label_mask], sigma2s,
-                                                             means, soft_targets[~label_mask]),
+                                     loss_func.md_loss(embeds[~label_mask], means, sigma2s,
+                                                       soft_targets[~label_mask]),
                                      (~label_mask).sum())
                 # only output annealed values for training since other phases will match it
                 if phase == "Train":
                     av_writer.update(f"{phase}/Average Variance Mean",
                                      torch.mean(sigma2s), num_samples)
-                # cache data for m step
-                if phase == "Train":
-                    unlab_embeds = torch.vstack((unlab_embeds, embeds[~label_mask]))
-                    unlab_resp = torch.vstack((unlab_resp, soft_targets[~label_mask]))
-                    label_embeds = torch.vstack((label_embeds, embeds[label_mask]))
-                    label_targets = torch.hstack((label_targets, targets[label_mask]))
             # operations on m step cache
             if phase == "Train":
                 # statistics for variance of embeddings and means
+                gmm_means = torch.Tensor(gmm.means_).to(device)
                 av_writer.update(f"{phase}/Average {label_types[0]} Embedding Variance",
                                  torch.mean(torch.var(label_embeds)),
                                  label_embeds.shape[0])
@@ -263,16 +262,17 @@ def train_gcd(args):
                 av_writer.update(f"{phase}/GMM Mean Average Variance",
                                  torch.mean(torch.var(gmm_means)),
                                  num_classes)
+                av_writer.update(f"{phase}/Average Means Sq MD",
+                                 loss_func.md_loss(means, gmm_means, sigma2s,
+                                                   torch.arange(num_classes)),
+                                 soft_targets.shape[0])
                 # update SSGMM using classifier predictions for unlabeled data
-                # TODO testing freezing only novel means
-                # frozen_gmm_means = gmm.means_
                 gmm.deep_m_step(
                     label_embeds.detach().cpu().numpy(),
                     label_targets.detach().cpu().numpy(),
                     unlab_embeds.detach().cpu().numpy(),
                     unlab_resp.detach().cpu().numpy(),
                     float(model.sigma2s[0].detach().cpu()))
-                # gmm.means_[len(normal_classes):] = frozen_gmm_means[len(normal_classes):]
                 # record percentage of active clusters
                 av_writer.update(f"{phase}/Percentage Active Clusters",
                                  np.mean(gmm.weights_ > 0))
