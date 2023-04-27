@@ -160,8 +160,8 @@ def update_cache_stats(av_writer, phase, label_types, loss_func, gmm, device, la
     av_writer.update(f"{phase}/GMM Mean Average Variance",
                      torch.mean(torch.var(gmm_means)))
     av_writer.update(f"{phase}/Average Means Sq MD",
-                     loss_func.md_loss(means, gmm_means, sigma2s,
-                                       torch.arange(num_classes)))
+                     loss_func.sq_mahalanobis_d(
+                        means, gmm_means, sigma2s, torch.arange(num_classes)).mean())
     # record percentage of active clusters
     av_writer.update(f"{phase}/Percentage Active Clusters",
                      len(torch.unique(preds_cache)) / num_classes)
