@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+import pickle
 import random
 
 import torch
@@ -314,6 +315,7 @@ def train_gcd(args):
     }, metric_dict)
     out_dir = Path(av_writer.writer.get_logdir())
     torch.save(model.state_dict(), out_dir / f"{args.num_epochs}.pt")
+    pickle.dump(gmm, open(out_dir / "gmm.pkl", "wb"))
     cache_test_outputs(model, normal_classes, test_loader, out_dir)
     eval_from_cache(out_dir)
 
