@@ -291,6 +291,7 @@ def train_gcd(args):
                         label_targets.detach().cpu().numpy(),
                         unlab_embeds.detach().cpu().numpy(),
                         unlab_resp.detach().cpu().numpy(),
+                        preds_cache.detach().cpu().numpy(),
                         float(model.sigma2s[0].detach().cpu()))
             # record end of training stats, grouped as Metrics in Tensorboard
             if phase != "Train" and epoch == args.num_epochs - 1:
