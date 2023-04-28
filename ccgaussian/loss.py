@@ -68,8 +68,9 @@ class GMMFixedLoss(NDCCLoss):
             ~label_mask, soft_targets.max(axis=1)[0] >= self.pseudo_thresh)
         # novel loss, checking for empty inputs
         if unlabel_mask.sum() > 0:
-            # no MD loss on unlabeled
-            novel_l = self.ce_loss(logits[unlabel_mask], soft_targets[unlabel_mask])
+            novel_l = self.ce_loss(logits[unlabel_mask], soft_targets[unlabel_mask]) + \
+                self.w_nll * self.md_loss(embeds[label_mask], means, sigma2s,
+                                          soft_targets[label_mask])
         else:
             novel_l = 0
         return (1 - self.w_unlab) * norm_l + self.w_unlab * novel_l
