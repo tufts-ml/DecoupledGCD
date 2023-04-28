@@ -266,7 +266,8 @@ def train_gcd(args):
                 if phase == "Train":
                     unlab_embeds = torch.vstack((unlab_embeds, embeds[~label_mask]))
                     unlab_resp = torch.vstack((unlab_resp,
-                                               torch.nn.functional.softmax(logits[~label_mask])))
+                                               torch.nn.functional.softmax(
+                                                logits[~label_mask], dim=1)))
                     label_embeds = torch.vstack((label_embeds, embeds[label_mask]))
                     label_targets = torch.hstack((label_targets, targets[label_mask]))
                     preds_cache = torch.hstack((preds_cache, preds))
