@@ -2,16 +2,23 @@ import numpy as np
 import scipy.optimize as optimize
 
 
-def cluster_acc(y_pred, y_true):
-    return _cluster_acc(*_assign_clusters(y_pred, y_true))
+def cluster_acc(y_pred, y_true, norm_classes):
+    row_ind, col_ind, weight = _assign_clusters(y_pred, y_true)
+    cluster_norm_mask = np.isin(row_ind, norm_classes)
+    return np.array([
+        _cluster_acc(row_ind, col_ind, weight),
+        _cluster_acc(row_ind[cluster_norm_mask], col_ind[cluster_norm_mask], weight),
+        _cluster_acc(row_ind[~cluster_norm_mask], col_ind[~cluster_norm_mask], weight)])
 
 
 def cluster_confusion(y_pred, y_true):
     return _cluster_confusion(*_assign_clusters(y_pred, y_true))
 
 
-# cluster functions based on:
+# cluster functions originally based on:
 # https://github.com/k-han/AutoNovel/blob/5eda7e45898cf3fbcde4c34b9c14c743082abd94/utils/util.py#L19\
+# but updated to reflect newer methodology:
+# https://github.com/sgvaze/generalized-category-discovery/blob/831a645c3d09a68ec4633a45741025765bacf7e0/project_utils/cluster_and_log_utils.py#L29
 
 
 def _assign_clusters(y_pred, y_true):
@@ -51,7 +58,7 @@ def _cluster_acc(row_ind, col_ind, weight):
     Returns:
         float: accuracy, in [0,1]
     """
-    return float(weight[row_ind, col_ind].sum()) / weight.sum()
+    return float(weight[row_ind, col_ind].sum()) / weight[:, col_ind].sum()
 
 
 def _cluster_confusion(row_ind, col_ind, weight):
