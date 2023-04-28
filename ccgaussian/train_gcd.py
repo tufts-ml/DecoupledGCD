@@ -45,6 +45,8 @@ def get_args():
     parser.add_argument("--var_warmup", type=int, default=25)
     parser.add_argument("--pseudo_thresh", type=float, default=.95,
                         help="Threshold for pseduo-label acceptance")
+    parser.add_argument("--gmm_freq", type=int, default=1,
+                        help="Number of epochs for each GMM M step")
     # loss hyperparameters
     parser.add_argument("--w_nll", type=float, default=.025,
                         help="Negative log-likelihood weight for embedding network")
@@ -281,13 +283,14 @@ def train_gcd(args):
                 update_cache_stats(av_writer, phase, label_types, loss_func, gmm, device,
                                    label_embeds, unlab_embeds, preds_cache, num_classes, means,
                                    sigma2s)
-                # update SSGMM using classifier predictions for unlabeled data
-                gmm.deep_m_step(
-                    label_embeds.detach().cpu().numpy(),
-                    label_targets.detach().cpu().numpy(),
-                    unlab_embeds.detach().cpu().numpy(),
-                    unlab_resp.detach().cpu().numpy(),
-                    float(model.sigma2s[0].detach().cpu()))
+                if epoch % args.gmm_freq == 0:
+                    # update SSGMM using classifier predictions for unlabeled data
+                    gmm.deep_m_step(
+                        label_embeds.detach().cpu().numpy(),
+                        label_targets.detach().cpu().numpy(),
+                        unlab_embeds.detach().cpu().numpy(),
+                        unlab_resp.detach().cpu().numpy(),
+                        float(model.sigma2s[0].detach().cpu()))
             # record end of training stats, grouped as Metrics in Tensorboard
             if phase != "Train" and epoch == args.num_epochs - 1:
                 # note non-numeric values (NaN, None, ect.) will cause entry
