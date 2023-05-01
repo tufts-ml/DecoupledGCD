@@ -24,8 +24,8 @@ def get_args():
     parser.add_argument(
         "--dataset_name", type=str, default="cub",
         choices=["NovelCraft", "cifar10", "cifar100", "imagenet_100", "cub", "scars",
-                 "fgvc_aricraft", "herbarium_19"],
-        help="options: NovelCraft, cifar10, cifar100, imagenet_100, cub, scars, fgvc_aricraft, " +
+                 "aircraft", "herbarium_19"],
+        help="options: NovelCraft, cifar10, cifar100, imagenet_100, cub, scars, aircraft, " +
              "herbarium_19")
     parser.add_argument('--prop_train_labels', type=float, default=0.5)
     # model label for logging
