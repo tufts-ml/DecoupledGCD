@@ -10,12 +10,12 @@ from gcd_cluster.ss_gmm import DeepSSGMM
 
 from gcd_data.get_datasets import get_class_splits, get_datasets
 
-from ccgaussian.augment import sim_gcd_train, sim_gcd_test
-from ccgaussian.logger import AverageWriter
-from ccgaussian.loss import GMMFixedLoss
-from ccgaussian.model import DinoCCG
-from ccgaussian.scheduler import warm_cos_scheduler
-from ccgaussian.test.eval import cache_test_outputs, eval_from_cache
+from dpn.augment import sim_gcd_train, sim_gcd_test
+from dpn.logger import AverageWriter
+from dpn.loss import GMMFixedLoss
+from dpn.model import DinoCCG
+from dpn.scheduler import warm_cos_scheduler
+from dpn.test.eval import cache_test_outputs, eval_from_cache
 
 
 def get_args():

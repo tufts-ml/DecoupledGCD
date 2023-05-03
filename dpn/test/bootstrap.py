@@ -1,6 +1,6 @@
 import numpy as np
 
-from ccgaussian.test.stats import cluster_acc
+from dpn.test.stats import cluster_acc
 
 
 def bootstrap_metric(y_pred, y_true, metric_func,

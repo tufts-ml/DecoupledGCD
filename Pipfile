@@ -14,7 +14,7 @@ verify_ssl = true
 name = "pytorch_cu117"
 
 [packages]
-ccgaussian = {editable = true, path = "."}
+dpn = {editable = true, path = "."}
 gcd-data = {editable = true, path = "./submodules/GCDdatasets"}
 polycraft-nov-data = {editable = true, path = "./submodules/GCDdatasets/submodules/polycraft-novelty-data"}
 gcd-cluster = {editable = true, path = "./submodules/GCDcluster"}

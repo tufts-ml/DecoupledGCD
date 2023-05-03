@@ -1,6 +1,6 @@
 import numpy as np
 
-from ccgaussian.test.bootstrap import bootstrap_metric
+from dpn.test.bootstrap import bootstrap_metric
 
 
 def _accuracy(y_pred, y_true):

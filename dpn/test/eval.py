@@ -2,9 +2,9 @@ from pathlib import Path
 
 import torch
 
-from ccgaussian.test.bootstrap import bootstrap_gcd_acc
-from ccgaussian.test.plot import plot_con_matrix, plot_gcd_ci
-from ccgaussian.test.stats import cluster_confusion
+from dpn.test.bootstrap import bootstrap_gcd_acc
+from dpn.test.plot import plot_con_matrix, plot_gcd_ci
+from dpn.test.stats import cluster_confusion
 
 
 def cache_test_outputs(model, normal_classes, test_loader, out_dir):

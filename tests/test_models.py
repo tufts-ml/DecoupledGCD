@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from ccgaussian.model import DinoCCG
+from dpn.model import DinoCCG
 
 
 input_shape = (8, 3, 32, 32)
