@@ -1,3 +1,6 @@
 [submodule "submodules/GCDdatasets"]
 	path = submodules/GCDdatasets
 	url = git@github.com:tufts-ai-robotics-group/GCDdatasets
+[submodule "submodules/GCDcluster"]
+	path = submodules/GCDcluster
+	url = git@github.com:tufts-ai-robotics-group/GCDcluster.git

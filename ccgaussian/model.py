@@ -3,7 +3,7 @@ import torch.nn as nn
 
 
 class DinoCCG(nn.Module):
-    def __init__(self, num_classes, init_var=1, end_var=.3, var_milestone=25) -> None:
+    def __init__(self, num_classes, init_var=1, end_var=.3, var_warmup=25) -> None:
         super().__init__()
         self.num_classes = num_classes
         # pretrained DINO backbone
@@ -17,7 +17,7 @@ class DinoCCG(nn.Module):
         # variance annealing parameters
         self.init_var = init_var
         self.end_var = end_var
-        self.var_milestone = var_milestone
+        self.var_warmup = var_warmup
 
     def gaussian_params(self):
         # class-conditional Gaussian parameters
@@ -35,7 +35,7 @@ class DinoCCG(nn.Module):
 
     def anneal_var(self, epoch_num):
         # determine factors for interpolation between init and end
-        epoch_factor = min(epoch_num / self.var_milestone, 1)
+        epoch_factor = min(epoch_num / self.var_warmup, 1)
         anneal_factor = float((1 + torch.cos(torch.scalar_tensor(epoch_factor * torch.pi))) / 2)
         # update variance, applying cos annealing in 1/x space used by loss then mapping to x space
         recip_init = 1 / self.init_var
