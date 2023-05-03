@@ -1,8 +1,8 @@
-# DPN
+# DecoupledGCD
 
-TODO badge
+[![DecoupledGCD](https://github.com/tufts-ml/DecoupledGCD/actions/workflows/main.yml/badge.svg)](https://github.com/tufts-ml/DecoupledGCD/actions/workflows/main.yml)
 
-Experimental class-conditional Gaussian models.
+Vision implementation of [Decoupled Prototypical Networks](https://arxiv.org/pdf/2211.15115.pdf) for GCD.
 
 The dependencies can be installed within a Pipenv with the following commands:
 ```
