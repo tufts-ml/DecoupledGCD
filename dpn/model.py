@@ -2,27 +2,19 @@ import torch
 import torch.nn as nn
 
 
-class DinoCCG(nn.Module):
-    def __init__(self, num_classes, init_var=1, end_var=.3, var_warmup=25) -> None:
+class DPN(nn.Module):
+    def __init__(self, num_classes, num_labeled_classes, l_proto, u_proto, l_moment=.9) -> None:
         super().__init__()
         self.num_classes = num_classes
+        self.num_labeled_classes = num_labeled_classes
+        self.l_proto = l_proto
+        self.u_proto = u_proto
+        self.l_moment = l_moment
         # pretrained DINO backbone
         self.dino = torch.hub.load('facebookresearch/dino:main', 'dino_vitb16')
         self.embed_len = self.dino.norm.normalized_shape[0]
-        # linear classification head
-        self.classifier = nn.Linear(self.embed_len, num_classes)
-        # class-conditional Gaussian parameters
-        self.sigma2s = nn.parameter.Parameter(
-            torch.Tensor([init_var] * self.embed_len), requires_grad=False)
-        # variance annealing parameters
-        self.init_var = init_var
-        self.end_var = end_var
-        self.var_warmup = var_warmup
-
-    def gaussian_params(self):
-        # class-conditional Gaussian parameters
-        means = self.classifier.weight * self.sigma2s
-        return means, self.sigma2s
+        # linear classification head for labeled classes only
+        self.classifier = nn.Linear(self.embed_len, num_labeled_classes)
 
     def forward(self, x):
         # DINO embeddings
@@ -30,15 +22,8 @@ class DinoCCG(nn.Module):
         embeds = raw_embeds.view(raw_embeds.shape[0], -1)
         # classifier prediction
         logits = self.classifier(embeds)
-        means, sigma2s = self.gaussian_params()
-        return logits, embeds, means, sigma2s
+        return logits, embeds
 
-    def anneal_var(self, epoch_num):
-        # determine factors for interpolation between init and end
-        epoch_factor = min(epoch_num / self.var_warmup, 1)
-        anneal_factor = float((1 + torch.cos(torch.scalar_tensor(epoch_factor * torch.pi))) / 2)
-        # update variance, applying cos annealing in 1/x space used by loss then mapping to x space
-        recip_init = 1 / self.init_var
-        recip_end = 1 / self.end_var
-        new_var = 1 / (recip_end + (recip_init - recip_end) * anneal_factor)
-        self.sigma2s[:] = new_var
+    def update_l_proto(self, labeled_embeddings):
+        new_l_proto = torch.mean(labeled_embeddings, dim=0)
+        self.l_proto = self.l_moment * self.l_proto + (1 - self.l_moment) * new_l_proto
