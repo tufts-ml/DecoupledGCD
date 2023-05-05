@@ -3,85 +3,86 @@ import torch.nn
 import torch.nn.functional as f
 
 
-class NDCCLoss(torch.nn.Module):
-    def __init__(self, w_nll) -> None:
+class DPNLoss(torch.nn.Module):
+    def __init__(self, temp=0.07, transfer_weight=10) -> None:
+        self.temp = temp
+        self.transfer_weight = transfer_weight
         super().__init__()
-        self.w_nll = w_nll
 
     @staticmethod
     def ce_loss(logits, targets):
         return f.cross_entropy(logits, targets)
 
     @staticmethod
-    def sq_mahalanobis_d(embeds, means, sigma2s, targets):
-        # goes from B x D to B
-        return ((embeds - means[targets])**2 / sigma2s).sum(dim=1)
+    def cos_sim(embeds, proto):
+        # add empty dimensions for easy broadcasting
+        embeds = embeds.unsqueeze(1)  # B x 1 x D
+        proto = proto.unsqueeze(0)  # 1 x K x D
+        # similarity to each prototype B x K
+        sim = f.cosine_similarity(embeds, proto, dim=2)
+        return sim
+
+    def norm_cos_sim(self, embeds, proto):
+        # similarity to each prototype B x K
+        sim = self.cos_sim(embeds, proto)
+        # temp softmax across clusters B x K
+        sim_norm = torch.softmax(sim / self.temp, dim=1)
+        return sim_norm
 
     @staticmethod
-    def nll_loss(embeds, means, sigma2s, targets):
-        # negative log-likelihood loss
-        return torch.log(sigma2s).sum() / 2 + \
-            torch.mean(NDCCLoss.sq_mahalanobis_d(embeds, means, sigma2s, targets)) / 2
+    def l2_dist(embeds, proto):
+        # add empty dimensions for easy broadcasting
+        embeds = embeds.unsqueeze(1)  # B x 1 x D
+        proto = proto.unsqueeze(0)  # 1 x K x D
+        # distance to each prototype B x K
+        dist = torch.norm(embeds - proto, p=2, dim=2)
+        return dist
 
-    def forward(self, logits, embeds, means, sigma2s, targets):
-        if embeds.shape[0] == 0:
-            return torch.scalar_tensor(0.)
-        return self.ce_loss(logits, targets) + \
-            self.w_nll * self.nll_loss(embeds, means, sigma2s, targets)
+    def spl_loss(self, u_embeds: torch.Tensor, u_proto: torch.Tensor):
+        """Semantic-aware Prototypical Learning loss
 
+        Args:
+            u_embeds (torch.Tensor): Unlabeled embeddings B x D
+            u_proto (torch.Tensor): Unlabeled prototypes K x D
 
-class NDCCFixedLoss(NDCCLoss):
-    # NDCCLoss for fixed variance
-    def forward(self, logits, embeds, means, sigma2s, targets):
-        if embeds.shape[0] == 0:
-            return torch.scalar_tensor(0.)
-        return self.ce_loss(logits, targets) + self.w_nll * \
-            torch.mean(NDCCLoss.sq_mahalanobis_d(embeds, means, sigma2s, targets))
+        Returns:
+            torch.Tensor: Scalar loss, averaged over B
+        """
+        # temp softmax across clusters B x K
+        sim_norm = self.norm_cos_sim(u_embeds, u_proto)
+        # distance to each prototype B x K
+        dist = self.l2_dist(u_embeds, u_proto)
+        # sum over K and take mean over B to get scalar
+        return torch.sum(dist * sim_norm, dim=1).mean()
 
+    def transfer_loss(self, uk_embeds: torch.Tensor, l_proto: torch.Tensor):
+        """Semantic-aware Prototypical Learning loss
 
-class GMMFixedLoss(NDCCLoss):
-    def __init__(self, w_nll, w_unlab, pseudo_thresh) -> None:
-        super().__init__(w_nll)
-        self.w_unlab = w_unlab
-        self.pseudo_thresh = pseudo_thresh
+        Args:
+            uk_embeds (torch.Tensor): Unlabeled known embeddings B x D
+            l_proto (torch.Tensor): Labeled prototypes K x D
 
-    def md_loss(self, embeds, means, sigma2s, soft_targets):
-        return NDCCLoss.sq_mahalanobis_d(
-            embeds, means, sigma2s, soft_targets.argmax(dim=1)).mean()
+        Returns:
+            torch.Tensor: Scalar loss, averaged over B
+        """
+        # temp softmax across clusters B x K
+        sim_norm = self.norm_cos_sim(uk_embeds, l_proto)
+        # distance to each prototype B x K
+        dist = 1 - self.cos_sim(uk_embeds, l_proto)
+        # sum over K and take mean over B to get scalar
+        return torch.sum(dist * sim_norm, dim=1).mean()
 
-    # NDCCLoss for soft labels and fixed variance
-    def forward(self, logits, embeds, means, sigma2s, soft_targets, label_mask):
-        if embeds.shape[0] == 0:
-            return torch.scalar_tensor(0.)
-        # validate soft_targets
-        assert torch.allclose(torch.sum(soft_targets, axis=1),
-                              torch.ones(soft_targets.shape[0]).to(soft_targets.device))
-        # normal loss, checking for empty inputs
+    def forward(self, logits, embeds, targets, label_mask, uk_mask, l_proto, u_proto):
+        n_loss = 0
+        k_loss = 0
+        # cross entropy loss on labeled data only
         if label_mask.sum() > 0:
-            norm_l = self.ce_loss(logits[label_mask], soft_targets[label_mask]) + \
-                self.w_nll * self.md_loss(embeds[label_mask], means, sigma2s,
-                                          soft_targets[label_mask])
-        else:
-            norm_l = 0
-        # create mask for unlabeled data accounting for pseudo-label thresholding
-        unlabel_mask = torch.logical_and(
-            ~label_mask, soft_targets.max(axis=1)[0] >= self.pseudo_thresh)
-        # novel loss, checking for empty inputs
-        if unlabel_mask.sum() > 0:
-            # no MD loss on unlabeled
-            novel_l = self.ce_loss(logits[unlabel_mask], soft_targets[unlabel_mask])
-        else:
-            novel_l = 0
-        return (1 - self.w_unlab) * norm_l + self.w_unlab * novel_l
-
-
-def all_sq_md(embeds, means, sigma2s):
-    # Mahalanobis distance for embeddings to each class
-    # goes from B x K x D to B x K
-    return torch.sum((torch.unsqueeze(embeds, dim=1) - means)**2 / sigma2s, dim=2)
-
-
-def novelty_sq_md(embeds, means, sigma2s):
-    # Mahalanobis distance for embeddings to closest class
-    # goes from B x K to B
-    return torch.min(all_sq_md(embeds, means, sigma2s), dim=1)[0]
+            k_loss += self.ce_loss(logits[label_mask], targets[label_mask])
+        # SPL and transfer losses on unlabeled data only
+        if (~label_mask).sum() > 0:
+            n_loss += self.spl_loss(embeds[~label_mask], u_proto)
+            if uk_mask.sum() > 0:
+                # check uk_mask is a subset of unlabeled data
+                assert torch.all((~label_mask)[uk_mask])
+                n_loss += self.transfer_weight * self.transfer_loss(embeds[uk_mask], l_proto)
+        return n_loss + k_loss

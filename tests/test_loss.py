@@ -6,44 +6,33 @@ import dpn.loss
 
 embed_dim = 768
 num_classes = 5
+num_labeled_classes = 3
+num_unlabeled_classes = num_classes - num_labeled_classes
 
 
 def dummy_data(num_samples):
-    logits = torch.rand((num_samples, num_classes))
+    logits = torch.rand((num_samples, num_labeled_classes))
     embeds = torch.rand((num_samples, embed_dim))
-    means = torch.rand((num_classes, embed_dim))
-    sigma2s = torch.rand(embed_dim) + 1
-    targets = torch.randint(0, num_classes, (num_samples,))
-    norm_mask = torch.tensor([True] * num_samples)
-    return logits, embeds, means, sigma2s, targets, norm_mask
+    l_proto = torch.rand((num_labeled_classes, embed_dim))
+    u_proto = torch.rand((num_unlabeled_classes, embed_dim))
+    targets = torch.randint(0, num_labeled_classes, (num_samples,))
+    label_mask = torch.tensor(
+        ([True] * (num_samples//2)) + ([False] * (num_samples - num_samples//2)),
+        dtype=bool)
+    uk_mask = ~label_mask
+    uk_mask[num_samples - num_samples//2:num_samples - num_samples//4] = False
+    return logits, embeds, targets, label_mask, uk_mask, l_proto, u_proto
 
 
 @pytest.mark.parametrize(
     "loss",
     [
-        dpn.loss.NDCCLoss(w_nll=.025),
-        dpn.loss.NDCCFixedLoss(w_nll=.025),
+        dpn.loss.DPNLoss(),
     ],
 )
-class TestNDCCLoss():
+class TestDPNLoss():
     def test_empty(self, loss):
-        logits, embeds, means, sigma2s, targets, _ = dummy_data(0)
-        assert loss(logits, embeds, means, sigma2s, targets) == 0
+        assert loss(*dummy_data(0)) == 0
 
-
-def test_empty_soft():
-    loss = dpn.loss.GMMFixedLoss(w_nll=.025, w_unlab=0, pseudo_thresh=0)
-    logits, embeds, means, sigma2s, targets, norm_mask = dummy_data(0)
-    assert loss(logits, embeds, means, sigma2s, targets, norm_mask) == 0
-
-
-def test_soft_consistent():
-    loss = dpn.loss.NDCCFixedLoss(w_nll=.025)
-    soft_loss = dpn.loss.GMMFixedLoss(w_nll=.025, w_unlab=0, pseudo_thresh=0)
-    num_samples = 8
-    logits, embeds, means, sigma2s, targets, norm_mask = dummy_data(num_samples)
-    soft_targets = torch.zeros((num_samples, num_classes))
-    soft_targets[torch.arange(num_samples), targets] = 1
-    loss_val = loss(logits, embeds, means, sigma2s, targets)
-    soft_loss_val = soft_loss(logits, embeds, means, sigma2s, soft_targets, norm_mask)
-    assert torch.allclose(loss_val, soft_loss_val)
+    def test_random(self, loss):
+        assert loss(*dummy_data(8)).shape == torch.Size([])
