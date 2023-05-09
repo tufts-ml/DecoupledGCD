@@ -81,11 +81,11 @@ class DPNLoss(torch.nn.Module):
         # SPL and transfer losses on unlabeled data only
         if (~label_mask).sum() > 0:
             n_loss += self.spl_loss(embeds[~label_mask], u_proto)
-            self.last_spl_loss = n_loss
+            self.last_spl_loss = n_loss.item()
             if uk_mask.sum() > 0:
                 n_loss += self.transfer_weight * self.transfer_loss(embeds[uk_mask], l_proto)
-                self.last_transfer_loss = n_loss - self.last_spl_loss
+                self.last_transfer_loss = (n_loss - self.last_spl_loss).item()
         # store loss values for logging
-        self.last_n_loss = n_loss
-        self.last_k_loss = k_loss
+        self.last_n_loss = n_loss.item()
+        self.last_k_loss = k_loss.item()
         return n_loss + k_loss
