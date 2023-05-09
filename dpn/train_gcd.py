@@ -223,17 +223,15 @@ def train_gcd(args):
             for batch in dataloader:
                 # use label mask to separate labeled and unlabeled for train batches
                 if phase == "Train":
-                    data, targets, dataset_idxs, label_mask = batch
+                    data, targets, dataset_idxs, label_mask = (item.to(device) for item in batch)
                     label_types = ["Labeled", "Unlabeled"]
                 # use label mask to separate normal and novel for non-train batches
                 else:
-                    data, targets, dataset_idxs = batch
+                    data, targets, dataset_idxs = (item.to(device) for item in batch)
                     label_mask = torch.isin(targets.to(device), normal_classes)
                     label_types = ["Normal", "Novel"]
-                # move data to device
-                data = data.to(device)
-                targets = targets.long().to(device)
-                label_mask = label_mask.to(device)
+                # cast targets and count samples in batch
+                targets = targets.long()
                 num_samples = data.shape[0]
                 # create unlabeled known mask, all False for validation set
                 uk_mask = torch.isin(dataset_idxs, uk_idxs)
