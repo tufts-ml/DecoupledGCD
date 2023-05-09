@@ -112,7 +112,7 @@ def init_proto(model: DPN, train_loader, args, device):
     # align unlabeled clusters to labeled clusters by shuffling indices to match
     cluster_dists = distance.cdist(l_proto, init_u_proto)
     row_ind, col_ind = linear_sum_assignment(cluster_dists)
-    u_proto = torch.empty_like(init_u_proto)
+    u_proto = torch.empty(init_u_proto.shape)
     for i in row_ind:
         u_proto[i] = init_u_proto[col_ind[i]]
     all_clusters = np.arange(args.num_labeled_classes + args.num_unlabeled_classes)
