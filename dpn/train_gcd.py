@@ -96,7 +96,7 @@ def init_proto(model: DPN, train_loader, args, device):
         uq_idxs = uq_idxs.to(device)
         label_mask = label_mask.to(device)
         with torch.set_grad_enabled(False):
-            _, embeds, _, _ = model(data)
+            _, embeds = model(data)
             unlab_embeds = torch.vstack((unlab_embeds, embeds[~label_mask]))
             label_embeds = torch.vstack((label_embeds, embeds[label_mask]))
             label_targets = torch.hstack((label_targets, targets[label_mask]))
