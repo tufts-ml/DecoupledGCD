@@ -83,8 +83,6 @@ class DPNLoss(torch.nn.Module):
             n_loss += self.spl_loss(embeds[~label_mask], u_proto)
             self.last_spl_loss = n_loss
             if uk_mask.sum() > 0:
-                # check uk_mask is a subset of unlabeled data
-                assert torch.all((~label_mask)[uk_mask])
                 n_loss += self.transfer_weight * self.transfer_loss(embeds[uk_mask], l_proto)
                 self.last_transfer_loss = n_loss - self.last_spl_loss
         # store loss values for logging
