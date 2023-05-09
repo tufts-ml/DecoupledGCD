@@ -106,7 +106,7 @@ def init_proto(model: DPN, train_loader, args, device):
     for i in range(args.num_labeled_classes):
         l_proto[i] = torch.mean(label_embeds[label_targets == i])
     # construct unlabeled prototypes
-    km = KMeans(args.num_labeled_classes + args.num_unlabeled_classes).fit(
+    km = KMeans(args.num_labeled_classes + args.num_unlabeled_classes, n_init=20).fit(
         unlab_embeds.cpu().numpy())
     init_u_proto = km.cluster_centers_
     # align unlabeled clusters to labeled clusters by shuffling indices to match
