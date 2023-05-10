@@ -28,4 +28,4 @@ class DPN(nn.Module):
         new_l_proto = torch.zeros_like(self.l_proto)
         for i in torch.unique(label_targets):
             new_l_proto[i] = torch.mean(label_embeds[label_targets == i], dim=0)
-        self.l_proto = self.l_moment * self.l_proto + (1 - self.l_moment) * new_l_proto
+        self.l_proto = (self.l_moment * self.l_proto + (1 - self.l_moment) * new_l_proto).detach()
