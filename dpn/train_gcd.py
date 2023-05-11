@@ -109,16 +109,17 @@ def init_proto(model: DPN, train_loader, args, device):
     km = KMeans(args.num_labeled_classes + args.num_unlabeled_classes, n_init=20).fit(
         unlab_embeds.cpu().numpy())
     init_u_proto = km.cluster_centers_
-    # align unlabeled clusters to labeled clusters by shuffling indices to match
+    # align unlabeled clusters to labeled clusters by finding num_labeled_classes matches
     cluster_dists = distance.cdist(l_proto, init_u_proto)
-    row_ind, col_ind = linear_sum_assignment(cluster_dists)
+    _, col_ind = linear_sum_assignment(cluster_dists)
+    # shuffle unlabeled prototypes to put in labeled order
     u_proto = torch.empty(init_u_proto.shape)
-    for i in row_ind:
-        u_proto[i] = torch.Tensor(init_u_proto[col_ind[i]])
+    u_proto[:args.num_labeled_classes] = torch.Tensor(init_u_proto[col_ind])
+    # find clusters not assigned to label
     all_clusters = np.arange(args.num_labeled_classes + args.num_unlabeled_classes)
-    unknown_clusters = torch.tensor(all_clusters[np.isin(all_clusters, col_ind)])
-    for i in range(args.num_unlabeled_classes):
-        u_proto[i + args.num_labeled_classes] = unknown_clusters[i]
+    unknown_clusters = torch.tensor(all_clusters[~np.isin(all_clusters, col_ind)])
+    # shuffle unassigned unlabeled clusters to end of unlabeled prototype list
+    u_proto[args.num_labeled_classes:] = torch.Tensor(init_u_proto[unknown_clusters])
     # find unlabeled known data based on K means labels (doesn't get updated)
     km.cluster_centers_ = u_proto.numpy()
     pseudo_labels = torch.tensor(km.predict(unlab_embeds.cpu().numpy()))
