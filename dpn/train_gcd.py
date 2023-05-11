@@ -282,10 +282,6 @@ def train_gcd(args):
     av_writer.writer.add_hparams({
         "lr_e": args.lr_e,
         "lr_c": args.lr_c,
-        "init_var": args.init_var,
-        "end_var": args.end_var,
-        "w_nll": args.w_nll,
-        "w_unlab": args.w_unlab,
     }, metric_dict)
     out_dir = Path(av_writer.writer.get_logdir())
     torch.save(model.state_dict(), out_dir / f"{args.num_epochs}.pt")
