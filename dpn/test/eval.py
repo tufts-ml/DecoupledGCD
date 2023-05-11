@@ -3,7 +3,7 @@ from pathlib import Path
 import torch
 
 from dpn.test.bootstrap import bootstrap_gcd_acc
-from dpn.test.plot import plot_con_matrix, plot_gcd_ci
+from dpn.test.plot import plot_gcd_ci, plot_gcd_confusion
 from dpn.test.stats import cluster_confusion
 
 
@@ -47,4 +47,6 @@ def eval_from_cache(out_dir):
     plot_gcd_ci(
         *bootstrap_gcd_acc(y_pred, y_true, norm_mask)
     ).savefig(out_dir / "acc_ci.png")
-    plot_con_matrix(cluster_confusion(y_pred, y_true)).savefig(out_dir / "conf_mat.png")
+    # get reduced confusion matrix
+    plot_gcd_confusion(cluster_confusion(y_pred, y_true), y_true, norm_mask).savefig(
+        out_dir / "conf_mat.png")
