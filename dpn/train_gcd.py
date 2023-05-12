@@ -104,7 +104,7 @@ def init_proto(model: DPN, train_loader, args, device):
     # construct labeled prototypes
     l_proto = torch.zeros((args.num_labeled_classes, model.embed_len))
     for i in range(args.num_labeled_classes):
-        l_proto[i] = torch.mean(label_embeds[label_targets == i])
+        l_proto[i] = torch.mean(label_embeds[label_targets == i], dim=0)
     # construct unlabeled prototypes
     km = KMeans(args.num_labeled_classes + args.num_unlabeled_classes, n_init=20).fit(
         unlab_embeds.cpu().numpy())
