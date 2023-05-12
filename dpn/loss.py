@@ -73,8 +73,8 @@ class DPNLoss(torch.nn.Module):
         return torch.sum(dist * sim_norm, dim=1).mean()
 
     def forward(self, logits, embeds, targets, label_mask, uk_mask, l_proto, u_proto):
-        n_loss = torch.tensor(0)
-        k_loss = torch.tensor(0)
+        n_loss = torch.tensor(0.).to(logits.device)
+        k_loss = torch.tensor(0.).to(logits.device)
         # cross entropy loss on labeled data only
         if label_mask.sum() > 0:
             k_loss += self.ce_loss(logits[label_mask], targets[label_mask])
