@@ -43,10 +43,13 @@ def eval_from_cache(out_dir):
     y_pred = torch.max(torch.load(out_dir / "logits.pt"), dim=1)[1].numpy()
     y_true = torch.load(out_dir / "targets.pt").numpy()
     norm_mask = torch.load(out_dir / "norm_mask.pt").numpy()
+    figs = []
     # get accuracies
-    plot_gcd_ci(
-        *bootstrap_gcd_acc(y_pred, y_true, norm_mask)
-    ).savefig(out_dir / "acc_ci.png")
+    ci_fig = plot_gcd_ci(*bootstrap_gcd_acc(y_pred, y_true, norm_mask))
+    ci_fig.savefig(out_dir / "acc_ci.png")
+    figs.append(ci_fig)
     # get reduced confusion matrix
-    plot_gcd_confusion(cluster_confusion(y_pred, y_true), y_true, norm_mask).savefig(
-        out_dir / "conf_mat.png")
+    cm_fig = plot_gcd_confusion(cluster_confusion(y_pred, y_true), y_true, norm_mask)
+    cm_fig.savefig(out_dir / "conf_mat.png")
+    figs.append(cm_fig)
+    return figs
