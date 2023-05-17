@@ -4,12 +4,13 @@ import numpy as np
 from sklearn.cluster import KMeans
 import torch
 
+from dpn.model import DPN
 from dpn.test.bootstrap import bootstrap_gcd_acc
 from dpn.test.plot import plot_gcd_ci, plot_gcd_confusion
 from dpn.test.stats import cluster_confusion
 
 
-def cache_test_outputs(model, normal_classes, test_loader, out_dir):
+def cache_test_outputs(model: DPN, normal_classes, test_loader, out_dir):
     out_dir = Path(out_dir)
     model.eval()
     # choose device
@@ -32,18 +33,23 @@ def cache_test_outputs(model, normal_classes, test_loader, out_dir):
         out_targets = torch.hstack((out_targets, targets))
         out_norm_mask = torch.hstack((out_norm_mask, norm_mask))
     # run K-means and cache outputs
-    out_preds = KMeans(n_clusters=len(torch.unique(out_targets)), n_init=20).fit_predict(
+    out_km_preds = KMeans(n_clusters=len(torch.unique(out_targets)), n_init=20).fit_predict(
         out_embeds.cpu().numpy())
+    # use learned prototypes for K-means and cache outputs
+    protos = np.vstack((model.l_proto.cpu().numpy(), model.u_proto.cpu().numpy()))
+    out_proto_preds = KMeans(n_clusters=len(torch.unique(out_targets)), n_init=0, init=protos)\
+        .predict(out_embeds)
     # write caches
     torch.save(out_embeds.cpu(), out_dir / "embeds.pt")
     torch.save(out_targets.cpu(), out_dir / "targets.pt")
     torch.save(out_norm_mask.cpu(), out_dir / "norm_mask.pt")
-    np.save(out_dir / "preds.npy", out_preds)
+    np.save(out_dir / "km_preds.npy", out_km_preds)
+    np.save(out_dir / "proto_preds.npy", out_proto_preds)
 
 
 def eval_from_cache(out_dir):
     out_dir = Path(out_dir)
-    y_pred = np.load(out_dir / "preds.npy")
+    y_pred = np.load(out_dir / "km_preds.npy")
     y_true = torch.load(out_dir / "targets.pt").numpy()
     norm_mask = torch.load(out_dir / "norm_mask.pt").numpy()
     figs = []
