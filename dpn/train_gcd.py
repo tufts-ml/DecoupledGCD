@@ -198,8 +198,8 @@ def train_gcd(args):
     metric_dict = {}
     # initialze prototypes
     l_proto, u_proto, uk_idxs = init_proto(model, train_loader, args, device)
-    model.l_proto = l_proto.to(device)
-    model.u_proto = u_proto.to(device)
+    model.l_proto = torch.nn.Parameter(l_proto).to(device)
+    model.u_proto = torch.nn.Parameter(u_proto).to(device)
     del l_proto, u_proto
     # model training
     for epoch in range(args.num_epochs):
