@@ -36,9 +36,9 @@ def cache_test_outputs(model: DPN, normal_classes, test_loader, out_dir):
     out_km_preds = KMeans(n_clusters=len(torch.unique(out_targets)), n_init=20).fit_predict(
         out_embeds.cpu().numpy())
     # use learned prototypes for K-means and cache outputs
-    protos = np.vstack((model.l_proto.cpu().numpy(), model.u_proto.cpu().numpy()))
-    out_proto_preds = KMeans(n_clusters=len(torch.unique(out_targets)), n_init=0, init=protos)\
-        .predict(out_embeds)
+    protos = model.u_proto.cpu().numpy()
+    out_proto_preds = KMeans(n_clusters=len(torch.unique(out_targets)), n_init=1, init=protos)\
+        .fit(protos).predict(out_embeds.cpu().numpy())
     # write caches
     torch.save(out_embeds.cpu(), out_dir / "embeds.pt")
     torch.save(out_targets.cpu(), out_dir / "targets.pt")
