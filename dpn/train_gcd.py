@@ -175,7 +175,7 @@ def train_gcd(args):
     normal_classes = torch.arange(args.num_labeled_classes).to(device)
     # init model
     num_classes = args.num_labeled_classes + args.num_unlabeled_classes
-    model = DPN(num_classes, args.num_labeled_classes, None, None).to(device)
+    model = DPN(num_classes, args.num_labeled_classes).to(device)
     # init optimizer
     optim = torch.optim.AdamW([
         {

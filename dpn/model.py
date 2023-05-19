@@ -3,7 +3,7 @@ import torch.nn as nn
 
 
 class DPN(nn.Module):
-    def __init__(self, num_classes, num_labeled_classes, l_proto, u_proto, l_moment=.9) -> None:
+    def __init__(self, num_classes, num_labeled_classes, l_moment=.9) -> None:
         super().__init__()
         self.num_classes = num_classes
         self.num_labeled_classes = num_labeled_classes
@@ -13,8 +13,6 @@ class DPN(nn.Module):
         self.embed_len = self.dino.norm.normalized_shape[0]
         # linear classification head for labeled classes only
         self.classifier = nn.Linear(self.embed_len, num_labeled_classes)
-        # initialize prototypes after setting up other parameters
-        self.set_protos(l_proto, u_proto)
 
     def forward(self, x):
         # DINO embeddings

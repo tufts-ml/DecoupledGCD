@@ -17,7 +17,9 @@ class TestDPN():
     def model(self):
         l_proto = torch.zeros((num_labeled_classes, embed_len))
         u_proto = torch.zeros((num_unlabeled_classes, embed_len))
-        return DPN(num_classes, num_labeled_classes, l_proto, u_proto)
+        dpn = DPN(num_classes, num_labeled_classes)
+        dpn.set_protos(l_proto, u_proto)
+        return dpn
 
     def test_forward(self, model):
         logits, embeds = model(torch.zeros(input_shape))
